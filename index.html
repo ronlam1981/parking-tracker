@@ -50,7 +50,7 @@
         .v-status .v-parking-type{font-size:13px;font-weight:600;margin-bottom:4px}
         .v-status .v-parking-time{font-size:12px;color:var(--txt2)}
         .v-status .v-parking-loc{font-size:12px;color:var(--txt2);margin-top:2px}
-        .v-status .v-parking-photo{width:100%;max-height:150px;object-fit:cover;border-radius:8px;margin-top:8px}
+        .v-status .v-parking-photo{width:100%;height:auto;border-radius:8px;margin-top:8px}
         .v-actions{display:flex;gap:8px;margin-top:10px}
         .v-actions button{flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
         .btn-park{background:var(--pri);color:#fff}
@@ -82,6 +82,10 @@
 
         /* ===== Meter duration ===== */
         .dur-grid{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+        .own-loc-card{display:flex;align-items:center;gap:10px;padding:12px 14px;border:2px solid var(--border);border-radius:10px;background:var(--card);margin-bottom:8px;cursor:pointer;transition:.2s}
+        .own-loc-card.sel{border-color:var(--pri);background:#eff6ff}
+        .btn-tiny{background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11px;color:var(--txt2);cursor:pointer}
+        .btn-tiny.del{color:var(--danger);border-color:#fecaca}
         .dur-btn{flex:1;min-width:70px;padding:14px 8px;border:2px solid var(--border);border-radius:10px;background:var(--card);text-align:center;cursor:pointer;font-size:14px;font-weight:600;transition:.2s}
         .dur-btn.sel{border-color:var(--warn);background:#fefce8;color:#a16207}
         .dur-btn .big{font-size:22px;font-weight:700;display:block}
@@ -205,6 +209,7 @@
     <button class="bnav-btn act" onclick="showPage('home')"><span class="ico">🏠</span>首頁</button>
     <button class="bnav-btn" onclick="showPage('history')"><span class="ico">📋</span>記錄</button>
     <button class="bnav-btn" onclick="showPage('reminders')"><span class="ico">🔔</span>提醒</button>
+    <button class="bnav-btn" onclick="showPage('settings')"><span class="ico">⚙️</span>設定</button>
 </nav>
 
 <!-- ==================== HOME ==================== -->
@@ -231,6 +236,23 @@
         </div>
     </div>
 
+    <!-- Step Own: Choose own parking location -->
+    <div id="parkStepOwn" class="hidden">
+        <div class="flow-title"><button class="flow-back" onclick="parkBack(1)">←</button>選擇停車場</div>
+        <div id="ownLocList"></div>
+        <div id="ownLocAdd" style="margin-top:14px">
+            <p class="section-title">新增停車場</p>
+            <div class="fg">
+                <input type="text" id="ownLocNewName" placeholder="例如：雲景台負二層31號車位">
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--txt2);margin-bottom:12px;cursor:pointer">
+                <input type="checkbox" id="ownLocNewDefault"> 設為預設停車場
+            </label>
+            <button class="btn btn-out btn-sm" onclick="addOwnLocation()">新增</button>
+        </div>
+        <button class="btn btn-pri" style="margin-top:16px" onclick="confirmOwnLoc()">確定</button>
+    </div>
+
     <!-- Step 2: Meter duration (only for meter) -->
     <div id="parkStep2" class="hidden">
         <div class="flow-title"><button class="flow-back" onclick="parkBack(1)">←</button>入錶時間</div>
@@ -254,6 +276,21 @@
             <a id="parkLocLink" href="#" target="_blank" style="display:none">在地圖查看</a>
         </div>
         <button class="btn btn-out btn-sm" onclick="getParkLocation()" style="margin-bottom:14px;width:auto">重新定位</button>
+
+        <p class="section-title">泊車時間</p>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+            <div class="dur-btn sel" id="timeNowBtn" onclick="selectParkTime(this, 0)" style="min-width:50px;padding:8px 12px;font-size:13px"><span class="big" style="font-size:16px">現在</span></div>
+            <div class="dur-btn" onclick="selectParkTime(this, 5)" style="min-width:50px;padding:8px 12px;font-size:13px">5分鐘前</div>
+            <div class="dur-btn" onclick="selectParkTime(this, 10)" style="min-width:50px;padding:8px 12px;font-size:13px">10分鐘前</div>
+            <div class="dur-btn" onclick="selectParkTime(this, 15)" style="min-width:50px;padding:8px 12px;font-size:13px">15分鐘前</div>
+            <div class="dur-btn" onclick="selectParkTime(this, 30)" style="min-width:50px;padding:8px 12px;font-size:13px">30分鐘前</div>
+            <div class="dur-btn" onclick="selectParkTime(this, 60)" style="min-width:50px;padding:8px 12px;font-size:13px">1小時前</div>
+        </div>
+        <div class="fg">
+            <label>或者自訂（幾分鐘前）</label>
+            <input type="number" id="parkTimeCustomMin" placeholder="輸入分鐘數" min="0" oninput="onCustomParkTime()">
+        </div>
+        <div id="parkTimePreview" style="font-size:12px;color:var(--pri);font-weight:600;margin-bottom:14px"></div>
 
         <p class="section-title">影相記錄（可選）</p>
         <div class="photo-box" id="parkPhotoBox" onclick="document.getElementById('parkPhotoInput').click()">
@@ -293,6 +330,27 @@
 <div id="pg-reminders" class="page">
     <p class="section-title">提醒事項</p>
     <div id="remList"></div>
+</div>
+
+<!-- ==================== SETTINGS ==================== -->
+<div id="pg-settings" class="page">
+    <p class="section-title">設定</p>
+    <div class="card">
+        <div class="fg">
+            <label>自動刪除泊車紀錄</label>
+            <select id="autoDeleteSetting" onchange="saveAutoDelete()">
+                <option value="0">不自動刪除</option>
+                <option value="3">3 天後自動刪除</option>
+                <option value="15">15 天後自動刪除</option>
+                <option value="30">30 天後自動刪除</option>
+            </select>
+        </div>
+        <p style="font-size:12px;color:var(--txt2)">只會刪除已完成（非進行中）嘅泊車紀錄</p>
+    </div>
+    <div class="card" style="margin-top:12px">
+        <p style="font-size:13px;color:var(--txt2);text-align:center">制作人：ronlam1981</p>
+        <p style="font-size:12px;color:var(--txt2);text-align:center;margin-top:6px">如有意見請電郵：<a href="mailto:ronlam1981@gmail.com" style="color:var(--pri)">ronlam1981@gmail.com</a></p>
+    </div>
 </div>
 
 <!-- ===== Toast ===== -->
@@ -374,6 +432,8 @@ function getVehicles() { return STORE.get('pk_vehicles', []) }
 function setVehicles(v) { STORE.set('pk_vehicles', v) }
 function getRecords() { return STORE.get('pk_records', []) }
 function setRecords(r) { STORE.set('pk_records', r) }
+function getOwnLocations() { return STORE.get('pk_own_locations', []) }
+function setOwnLocations(l) { STORE.set('pk_own_locations', l) }
 
 // ================================================================
 //  NAVIGATION
@@ -384,13 +444,14 @@ function showPage(id) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById('pg-' + id).classList.add('active');
     document.querySelectorAll('.bnav-btn').forEach((b, i) => {
-        b.classList.toggle('act', (i === 0 && id === 'home') || (i === 1 && id === 'history') || (i === 2 && id === 'reminders'));
+        b.classList.toggle('act', (i === 0 && id === 'home') || (i === 1 && id === 'history') || (i === 2 && id === 'reminders') || (i === 3 && id === 'settings'));
     });
     if (id === 'home') { renderHome(); document.getElementById('hdrTitle').textContent = '泊車記錄'; }
     if (id === 'history') { renderHistory(); document.getElementById('hdrTitle').textContent = '泊車歷史'; }
     if (id === 'reminders') { renderReminders(); document.getElementById('hdrTitle').textContent = '提醒事項'; }
     if (id === 'vehicles') { renderVehicles(); document.getElementById('hdrTitle').textContent = '管理車輛'; }
     if (id === 'park') { document.getElementById('hdrTitle').textContent = '泊車'; }
+    if (id === 'settings') { renderSettings(); document.getElementById('hdrTitle').textContent = '設定'; }
     window.scrollTo(0, 0);
 }
 
@@ -710,7 +771,8 @@ let parkState = {
     parkType: null,
     meterMinutes: null,
     location: null,
-    photo: null
+    photo: null,
+    timeOffsetMin: 0
 };
 
 function startParking(vehicleId) {
@@ -718,11 +780,12 @@ function startParking(vehicleId) {
     const v = vehicles.find(x => x.id === vehicleId);
     if (!v) return;
 
-    parkState = { vehicleId: v.id, vehicleType: v.type, parkType: null, meterMinutes: null, location: null, photo: null };
+    parkState = { vehicleId: v.id, vehicleType: v.type, parkType: null, meterMinutes: null, location: null, photo: null, timeOffsetMin: 0 };
     document.getElementById('parkVehicleName').textContent = `${v.name} — 泊車`;
 
     // Reset steps
     document.getElementById('parkStep1').classList.remove('hidden');
+    document.getElementById('parkStepOwn').classList.add('hidden');
     document.getElementById('parkStep2').classList.add('hidden');
     document.getElementById('parkStep3').classList.add('hidden');
     document.querySelectorAll('#parkStep1 .p-type-card').forEach(c => c.classList.remove('sel'));
@@ -730,24 +793,159 @@ function startParking(vehicleId) {
     showPage('park');
 }
 
+let selectedOwnLocId = null;
+
 function selectParkType(type) {
     parkState.parkType = type;
 
     if (type === 'own') {
-        // Own parking — auto-fill default location and save directly
-        showDetailsStep();
-        document.getElementById('parkDesc').value = '雲景台負二層31號車位';
+        showOwnLocStep();
     } else if (type === 'meter') {
-        // Show meter duration step
         showMeterStep();
     } else {
-        // Skip to details
         showDetailsStep();
+    }
+}
+
+function showOwnLocStep() {
+    document.getElementById('parkStep1').classList.add('hidden');
+    document.getElementById('parkStepOwn').classList.remove('hidden');
+    document.getElementById('parkStep2').classList.add('hidden');
+    document.getElementById('parkStep3').classList.add('hidden');
+
+    const locs = getOwnLocations();
+    selectedOwnLocId = null;
+
+    // Find default
+    const def = locs.find(l => l.isDefault);
+    if (def) selectedOwnLocId = def.id;
+
+    renderOwnLocList();
+
+    // Clear new input
+    document.getElementById('ownLocNewName').value = '';
+    document.getElementById('ownLocNewDefault').checked = false;
+}
+
+function renderOwnLocList() {
+    const locs = getOwnLocations();
+    const container = document.getElementById('ownLocList');
+
+    if (locs.length === 0) {
+        container.innerHTML = '<p style="color:var(--txt2);font-size:14px;text-align:center;padding:16px 0">未有儲存嘅停車場，請喺下面新增</p>';
+        return;
+    }
+
+    container.innerHTML = locs.map(l => `
+        <div class="own-loc-card ${selectedOwnLocId === l.id ? 'sel' : ''}" onclick="selectOwnLoc('${l.id}')">
+            <div style="flex:1">
+                <div style="font-weight:600;font-size:15px">${esc(l.name)}</div>
+                ${l.isDefault ? '<span style="font-size:11px;color:var(--pri);font-weight:600">⭐ 預設</span>' : ''}
+            </div>
+            <div style="display:flex;gap:6px;align-items:center">
+                <button class="btn-tiny" onclick="event.stopPropagation();toggleOwnDefault('${l.id}')">${l.isDefault ? '取消預設' : '設預設'}</button>
+                <button class="btn-tiny del" onclick="event.stopPropagation();deleteOwnLoc('${l.id}')">刪除</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function selectOwnLoc(id) {
+    selectedOwnLocId = id;
+    renderOwnLocList();
+}
+
+function addOwnLocation() {
+    const name = document.getElementById('ownLocNewName').value.trim();
+    if (!name) { toast('請輸入停車場名稱'); return; }
+
+    const isDefault = document.getElementById('ownLocNewDefault').checked;
+    const locs = getOwnLocations();
+
+    if (isDefault) {
+        locs.forEach(l => l.isDefault = false);
+    }
+
+    const newLoc = { id: Date.now().toString(), name, isDefault };
+    locs.push(newLoc);
+    setOwnLocations(locs);
+
+    selectedOwnLocId = newLoc.id;
+    document.getElementById('ownLocNewName').value = '';
+    document.getElementById('ownLocNewDefault').checked = false;
+    renderOwnLocList();
+    toast('停車場已新增');
+}
+
+function toggleOwnDefault(id) {
+    const locs = getOwnLocations();
+    const loc = locs.find(l => l.id === id);
+    if (!loc) return;
+
+    if (loc.isDefault) {
+        loc.isDefault = false;
+    } else {
+        locs.forEach(l => l.isDefault = false);
+        loc.isDefault = true;
+    }
+    setOwnLocations(locs);
+    renderOwnLocList();
+}
+
+function deleteOwnLoc(id) {
+    let locs = getOwnLocations();
+    locs = locs.filter(l => l.id !== id);
+    setOwnLocations(locs);
+    if (selectedOwnLocId === id) {
+        const def = locs.find(l => l.isDefault);
+        selectedOwnLocId = def ? def.id : null;
+    }
+    renderOwnLocList();
+    toast('停車場已刪除');
+}
+
+function confirmOwnLoc() {
+    const locs = getOwnLocations();
+    if (locs.length === 0) { toast('請先新增停車場'); return; }
+    if (!selectedOwnLocId) { toast('請選擇停車場'); return; }
+
+    const loc = locs.find(l => l.id === selectedOwnLocId);
+    showDetailsStep();
+    if (loc) {
+        document.getElementById('parkDesc').value = loc.name;
+    }
+}
+
+function selectParkTime(el, min) {
+    document.querySelectorAll('#parkStep3 .dur-btn').forEach(b => b.classList.remove('sel'));
+    el.classList.add('sel');
+    parkState.timeOffsetMin = min;
+    document.getElementById('parkTimeCustomMin').value = '';
+    updateParkTimePreview();
+}
+
+function onCustomParkTime() {
+    const val = parseInt(document.getElementById('parkTimeCustomMin').value);
+    if (val >= 0) {
+        parkState.timeOffsetMin = val;
+        document.querySelectorAll('#parkStep3 .dur-btn').forEach(b => b.classList.remove('sel'));
+        updateParkTimePreview();
+    }
+}
+
+function updateParkTimePreview() {
+    const el = document.getElementById('parkTimePreview');
+    if (parkState.timeOffsetMin <= 0) {
+        el.textContent = '泊車時間：現在';
+    } else {
+        const t = new Date(Date.now() - parkState.timeOffsetMin * 60000);
+        el.textContent = `泊車時間：${fmtDateTime(t)}（${parkState.timeOffsetMin} 分鐘前）`;
     }
 }
 
 function showMeterStep() {
     document.getElementById('parkStep1').classList.add('hidden');
+    document.getElementById('parkStepOwn').classList.add('hidden');
     document.getElementById('parkStep2').classList.remove('hidden');
     document.getElementById('parkStep3').classList.add('hidden');
 
@@ -795,17 +993,23 @@ function confirmMeterDur() {
 
 function showDetailsStep() {
     document.getElementById('parkStep1').classList.add('hidden');
+    document.getElementById('parkStepOwn').classList.add('hidden');
     document.getElementById('parkStep2').classList.add('hidden');
     document.getElementById('parkStep3').classList.remove('hidden');
 
     // Reset
     parkState.photo = null;
     parkState.location = null;
+    parkState.timeOffsetMin = 0;
     const box = document.getElementById('parkPhotoBox');
     box.classList.remove('has');
     box.innerHTML = '<div class="ph-ico">📷</div><div class="ph-txt">點擊影相或上傳</div>';
     document.getElementById('parkDesc').value = '';
     document.getElementById('parkNotes').value = '';
+    document.getElementById('parkTimeCustomMin').value = '';
+    document.querySelectorAll('#parkStep3 .dur-btn').forEach(b => b.classList.remove('sel'));
+    document.getElementById('timeNowBtn').classList.add('sel');
+    updateParkTimePreview();
 
     getParkLocation();
 }
@@ -814,15 +1018,10 @@ function parkBack(step) {
     if (step === 1) {
         showPage('home');
     } else if (step === 2) {
-        if (parkState.parkType === 'meter') {
-            document.getElementById('parkStep1').classList.remove('hidden');
-            document.getElementById('parkStep2').classList.add('hidden');
-            document.getElementById('parkStep3').classList.add('hidden');
-        } else {
-            document.getElementById('parkStep1').classList.remove('hidden');
-            document.getElementById('parkStep2').classList.add('hidden');
-            document.getElementById('parkStep3').classList.add('hidden');
-        }
+        document.getElementById('parkStep1').classList.remove('hidden');
+        document.getElementById('parkStepOwn').classList.add('hidden');
+        document.getElementById('parkStep2').classList.add('hidden');
+        document.getElementById('parkStep3').classList.add('hidden');
     }
 }
 
@@ -854,18 +1053,19 @@ function handleParkPhoto(input) {
     const file = input.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = e => {
-        parkState.photo = e.target.result;
+    reader.onload = async e => {
+        const compressed = await compressPhoto(e.target.result, 1200, 0.85);
+        parkState.photo = compressed;
         const box = document.getElementById('parkPhotoBox');
         box.classList.add('has');
-        box.innerHTML = `<img src="${parkState.photo}" alt="泊車相片">`;
+        box.innerHTML = `<img src="${compressed}" alt="泊車相片">`;
     };
     reader.readAsDataURL(file);
 }
 
 // Save parking record
 function saveParkRecord() {
-    const now = new Date();
+    const now = new Date(Date.now() - (parkState.timeOffsetMin || 0) * 60000);
     const record = {
         id: Date.now().toString(),
         vehicleId: parkState.vehicleId,
@@ -1078,11 +1278,12 @@ function handleVehPhoto(input) {
     const file = input.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = e => {
-        vehPhotoData = e.target.result;
+    reader.onload = async e => {
+        const compressed = await compressPhoto(e.target.result, 400, 0.8);
+        vehPhotoData = compressed;
         const box = document.getElementById('vehPhotoBox');
         box.classList.add('has');
-        box.innerHTML = `<img src="${vehPhotoData}" alt="車輛相片">`;
+        box.innerHTML = `<img src="${compressed}" alt="車輛相片">`;
     };
     reader.readAsDataURL(file);
 }
@@ -1324,6 +1525,65 @@ function viewPhoto(src) {
 }
 
 // ================================================================
+//  PHOTO COMPRESSION
+// ================================================================
+function compressPhoto(dataUrl, maxWidth, quality) {
+    maxWidth = maxWidth || 1200;
+    quality = quality || 0.85;
+    return new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => {
+            let w = img.width, h = img.height;
+            if (w > maxWidth) {
+                h = Math.round(h * maxWidth / w);
+                w = maxWidth;
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.src = dataUrl;
+    });
+}
+
+// ================================================================
+//  SETTINGS & AUTO-DELETE
+// ================================================================
+function getAutoDeleteDays() {
+    return parseInt(localStorage.getItem('pk_auto_delete') || '0');
+}
+
+function renderSettings() {
+    document.getElementById('autoDeleteSetting').value = getAutoDeleteDays().toString();
+}
+
+function saveAutoDelete() {
+    const val = document.getElementById('autoDeleteSetting').value;
+    localStorage.setItem('pk_auto_delete', val);
+    toast('設定已儲存');
+    cleanupOldRecords();
+}
+
+function cleanupOldRecords() {
+    const days = getAutoDeleteDays();
+    if (days <= 0) return;
+
+    const cutoff = Date.now() - days * 24 * 60 * 60000;
+    let records = getRecords();
+    const before = records.length;
+    records = records.filter(r => {
+        if (r.active) return true;
+        return new Date(r.timestamp).getTime() > cutoff;
+    });
+    if (records.length < before) {
+        setRecords(records);
+    }
+}
+
+// ================================================================
 //  HELPERS
 // ================================================================
 function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -1349,6 +1609,9 @@ function toast(msg) { const t = document.getElementById('toast'); t.textContent 
     if ('Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission();
     }
+
+    // Auto-delete old records
+    cleanupOldRecords();
 
     // Re-schedule reminders for active records
     const records = getRecords();
