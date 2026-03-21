@@ -253,22 +253,20 @@
         <button class="btn btn-pri" style="margin-top:16px" onclick="confirmOwnLoc()">確定</button>
     </div>
 
-    <!-- Step 2: Meter duration (only for meter) -->
-    <div id="parkStep2" class="hidden">
-        <div class="flow-title"><button class="flow-back" onclick="parkBack(1)">←</button>入錶時間</div>
-        <p class="section-title" id="meterDurLabel">選擇入標時間</p>
-        <div class="dur-grid" id="meterDurGrid"></div>
-        <div class="divider"></div>
-        <div class="fg">
-            <label>或者自訂入標時間（分鐘）</label>
-            <input type="number" id="customMeterMin" placeholder="輸入分鐘數，例如 90" min="1" oninput="onCustomMeter()">
-        </div>
-        <button class="btn btn-pri" onclick="confirmMeterDur()">確定</button>
-    </div>
-
-    <!-- Step 3: Photo + details -->
+    <!-- Step 3: Photo + details (meter duration also shown here for meter type) -->
     <div id="parkStep3" class="hidden">
         <div class="flow-title"><button class="flow-back" onclick="parkBack(2)">←</button>記錄詳情</div>
+
+        <!-- Meter duration section (only visible for meter type) -->
+        <div id="meterDurSection" class="hidden">
+            <p class="section-title" id="meterDurLabel">選擇入標時間</p>
+            <div class="dur-grid" id="meterDurGrid"></div>
+            <div class="fg" style="margin-top:8px">
+                <label>或者自訂入標時間（分鐘）</label>
+                <input type="number" id="customMeterMin" placeholder="輸入分鐘數，例如 90" min="1" oninput="onCustomMeter()">
+            </div>
+            <div class="divider"></div>
+        </div>
 
         <div class="loc-box">
             <div class="st" id="parkLocSt">正在定位...</div>
@@ -277,7 +275,7 @@
         </div>
         <button class="btn btn-out btn-sm" onclick="getParkLocation()" style="margin-bottom:14px;width:auto">重新定位</button>
 
-        <p class="section-title">泊車時間</p>
+        <p class="section-title" id="parkTimeLabel">泊車時間</p>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">
             <div class="dur-btn sel" id="timeNowBtn" onclick="selectParkTime(this, 0)" style="min-width:50px;padding:8px 12px;font-size:13px"><span class="big" style="font-size:16px">現在</span></div>
             <div class="dur-btn" onclick="selectParkTime(this, 5)" style="min-width:50px;padding:8px 12px;font-size:13px">5分鐘前</div>
@@ -839,8 +837,6 @@ function selectParkType(type) {
 
     if (type === 'own') {
         showOwnLocStep();
-    } else if (type === 'meter') {
-        showMeterStep();
     } else {
         showDetailsStep();
     }
@@ -974,20 +970,67 @@ function onCustomParkTime() {
 
 function updateParkTimePreview() {
     const el = document.getElementById('parkTimePreview');
+    const label = parkState.parkType === 'meter' ? '咪錶夠鐘提醒時間' : '泊車時間';
     if (parkState.timeOffsetMin <= 0) {
-        el.textContent = '泊車時間：現在';
+        el.textContent = `${label}：現在`;
     } else {
         const t = new Date(Date.now() - parkState.timeOffsetMin * 60000);
-        el.textContent = `泊車時間：${fmtDateTime(t)}（${parkState.timeOffsetMin} 分鐘前）`;
+        el.textContent = `${label}：${fmtDateTime(t)}（${parkState.timeOffsetMin} 分鐘前）`;
     }
 }
 
-function showMeterStep() {
+
+function selectMeterDur(el, min) {
+    document.querySelectorAll('#meterDurSection .dur-btn').forEach(b => b.classList.remove('sel'));
+    el.classList.add('sel');
+    parkState.meterMinutes = min;
+    document.getElementById('customMeterMin').value = '';
+}
+
+function onCustomMeter() {
+    const val = parseInt(document.getElementById('customMeterMin').value);
+    if (val > 0) {
+        parkState.meterMinutes = val;
+        document.querySelectorAll('#meterDurSection .dur-btn').forEach(b => b.classList.remove('sel'));
+    }
+}
+
+function showDetailsStep() {
     document.getElementById('parkStep1').classList.add('hidden');
     document.getElementById('parkStepOwn').classList.add('hidden');
-    document.getElementById('parkStep2').classList.remove('hidden');
-    document.getElementById('parkStep3').classList.add('hidden');
+    document.getElementById('parkStep3').classList.remove('hidden');
 
+    // Reset
+    parkState.photo = null;
+    parkState.location = null;
+    parkState.timeOffsetMin = 0;
+    parkState.meterMinutes = 0;
+    const box = document.getElementById('parkPhotoBox');
+    box.classList.remove('has');
+    box.innerHTML = '<div class="ph-ico">📷</div><div class="ph-txt">點擊影相或上傳</div>';
+    document.getElementById('parkDesc').value = '';
+    document.getElementById('parkNotes').value = '';
+    document.getElementById('parkTimeCustomMin').value = '';
+    document.querySelectorAll('#parkStep3 .dur-btn').forEach(b => b.classList.remove('sel'));
+    document.getElementById('timeNowBtn').classList.add('sel');
+    updateParkTimePreview();
+
+    // Meter duration section: show/hide based on type
+    const meterSection = document.getElementById('meterDurSection');
+    const timeLabel = document.getElementById('parkTimeLabel');
+    if (parkState.parkType === 'meter') {
+        meterSection.classList.remove('hidden');
+        timeLabel.textContent = '咪錶夠鐘提醒時間';
+        setupMeterGrid();
+    } else {
+        meterSection.classList.add('hidden');
+        timeLabel.textContent = '泊車時間';
+    }
+
+    getParkLocation();
+}
+
+function setupMeterGrid() {
     const grid = document.getElementById('meterDurGrid');
     const isCar = parkState.vehicleType === 'car';
 
@@ -1007,59 +1050,12 @@ function showMeterStep() {
     document.getElementById('customMeterMin').value = '';
 }
 
-function selectMeterDur(el, min) {
-    document.querySelectorAll('#parkStep2 .dur-btn').forEach(b => b.classList.remove('sel'));
-    el.classList.add('sel');
-    parkState.meterMinutes = min;
-    document.getElementById('customMeterMin').value = '';
-}
-
-function onCustomMeter() {
-    const val = parseInt(document.getElementById('customMeterMin').value);
-    if (val > 0) {
-        parkState.meterMinutes = val;
-        document.querySelectorAll('#parkStep2 .dur-btn').forEach(b => b.classList.remove('sel'));
-    }
-}
-
-function confirmMeterDur() {
-    if (!parkState.meterMinutes || parkState.meterMinutes <= 0) {
-        toast('請選擇或輸入入標時間');
-        return;
-    }
-    showDetailsStep();
-}
-
-function showDetailsStep() {
-    document.getElementById('parkStep1').classList.add('hidden');
-    document.getElementById('parkStepOwn').classList.add('hidden');
-    document.getElementById('parkStep2').classList.add('hidden');
-    document.getElementById('parkStep3').classList.remove('hidden');
-
-    // Reset
-    parkState.photo = null;
-    parkState.location = null;
-    parkState.timeOffsetMin = 0;
-    const box = document.getElementById('parkPhotoBox');
-    box.classList.remove('has');
-    box.innerHTML = '<div class="ph-ico">📷</div><div class="ph-txt">點擊影相或上傳</div>';
-    document.getElementById('parkDesc').value = '';
-    document.getElementById('parkNotes').value = '';
-    document.getElementById('parkTimeCustomMin').value = '';
-    document.querySelectorAll('#parkStep3 .dur-btn').forEach(b => b.classList.remove('sel'));
-    document.getElementById('timeNowBtn').classList.add('sel');
-    updateParkTimePreview();
-
-    getParkLocation();
-}
-
 function parkBack(step) {
     if (step === 1) {
         showPage('home');
     } else if (step === 2) {
         document.getElementById('parkStep1').classList.remove('hidden');
         document.getElementById('parkStepOwn').classList.add('hidden');
-        document.getElementById('parkStep2').classList.add('hidden');
         document.getElementById('parkStep3').classList.add('hidden');
     }
 }
@@ -1104,6 +1100,10 @@ function handleParkPhoto(input) {
 
 // Save parking record
 function saveParkRecord() {
+    if (parkState.parkType === 'meter' && (!parkState.meterMinutes || parkState.meterMinutes <= 0)) {
+        toast('請選擇或輸入入標時間');
+        return;
+    }
     const now = new Date(Date.now() - (parkState.timeOffsetMin || 0) * 60000);
     const record = {
         id: Date.now().toString(),
