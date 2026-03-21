@@ -293,11 +293,16 @@
         <div id="parkTimePreview" style="font-size:12px;color:var(--pri);font-weight:600;margin-bottom:14px"></div>
 
         <p class="section-title">影相記錄（可選）</p>
-        <div class="photo-box" id="parkPhotoBox" onclick="document.getElementById('parkPhotoInput').click()">
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+            <button class="btn btn-out btn-sm" style="flex:1" onclick="document.getElementById('parkPhotoInputCam').click()">📷 影相</button>
+            <button class="btn btn-out btn-sm" style="flex:1" onclick="document.getElementById('parkPhotoInputFile').click()">📁 上載舊相</button>
+        </div>
+        <div class="photo-box" id="parkPhotoBox" onclick="document.getElementById('parkPhotoInputCam').click()">
             <div class="ph-ico">📷</div>
             <div class="ph-txt">點擊影相或上傳</div>
         </div>
-        <input type="file" id="parkPhotoInput" accept="image/*" capture="environment" onchange="handleParkPhoto(this)">
+        <input type="file" id="parkPhotoInputCam" accept="image/*" capture="environment" onchange="handleParkPhoto(this)">
+        <input type="file" id="parkPhotoInputFile" accept="image/*" onchange="handleParkPhoto(this)">
 
         <div class="fg">
             <label>位置描述（可選）</label>
@@ -346,6 +351,24 @@
             </select>
         </div>
         <p style="font-size:12px;color:var(--txt2)">只會刪除已完成（非進行中）嘅泊車紀錄</p>
+    </div>
+    <div class="card" style="margin-top:12px">
+        <p class="section-title" style="margin-bottom:8px">資料備份</p>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+            <button class="btn" style="flex:1;font-size:14px" onclick="exportData()">📤 匯出資料</button>
+            <button class="btn btn-out" style="flex:1;font-size:14px" onclick="document.getElementById('importFile').click()">📥 匯入資料</button>
+            <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+        </div>
+        <div class="fg" style="margin-bottom:8px">
+            <label>自動備份提醒</label>
+            <select id="autoBackupSetting" onchange="saveAutoBackup()">
+                <option value="0">關閉</option>
+                <option value="7">每 7 天提醒一次</option>
+                <option value="14">每 14 天提醒一次</option>
+                <option value="30">每 30 天提醒一次</option>
+            </select>
+        </div>
+        <p id="lastBackupInfo" style="font-size:12px;color:var(--txt2)"></p>
     </div>
     <div class="card" style="margin-top:12px">
         <p style="font-size:13px;color:var(--txt2);text-align:center">制作人：ronlam1981</p>
@@ -446,13 +469,29 @@ function showPage(id) {
     document.querySelectorAll('.bnav-btn').forEach((b, i) => {
         b.classList.toggle('act', (i === 0 && id === 'home') || (i === 1 && id === 'history') || (i === 2 && id === 'reminders') || (i === 3 && id === 'settings'));
     });
-    if (id === 'home') { renderHome(); document.getElementById('hdrTitle').textContent = '泊車記錄'; }
+    if (id === 'home') {
+        checkAndSendReminders();
+        saveRecords(); // 保存提醒狀態
+        renderHome();
+        document.getElementById('hdrTitle').textContent = '泊車記錄';
+    }
     if (id === 'history') { renderHistory(); document.getElementById('hdrTitle').textContent = '泊車歷史'; }
-    if (id === 'reminders') { renderReminders(); document.getElementById('hdrTitle').textContent = '提醒事項'; }
+    if (id === 'reminders') {
+        checkAndSendReminders();
+        saveRecords();
+        renderReminders();
+        document.getElementById('hdrTitle').textContent = '提醒事項';
+    }
     if (id === 'vehicles') { renderVehicles(); document.getElementById('hdrTitle').textContent = '管理車輛'; }
     if (id === 'park') { document.getElementById('hdrTitle').textContent = '泊車'; }
     if (id === 'settings') { renderSettings(); document.getElementById('hdrTitle').textContent = '設定'; }
     window.scrollTo(0, 0);
+}
+
+function saveRecords() {
+    // 保存記錄（包含提醒狀態）
+    const records = getRecords();
+    setRecords(records);
 }
 
 // ================================================================
@@ -1098,84 +1137,97 @@ function saveParkRecord() {
 }
 
 // ================================================================
-//  REMINDER SYSTEM
+//  REMINDER SYSTEM (檢查式，不依賴 setTimeout)
 // ================================================================
-let reminderTimers = [];
-
-function clearAllReminders() {
-    reminderTimers.forEach(t => clearTimeout(t));
-    reminderTimers = [];
-}
-
 function scheduleReminders(record) {
-    const v = getVehicles().find(x => x.id === record.vehicleId);
-    const vName = v ? v.name : '你架車';
-
-    if (record.parkType === 'free') {
-        // Free street: remind every 24 hours
-        scheduleFreeReminders(record, vName);
-    } else if (record.parkType === 'meter' && record.meterEndTime) {
-        // Meter: 15min before, at expiry, then every 1hr after
-        scheduleMeterReminders(record, vName);
-    } else if (record.parkType === 'lot') {
-        // Public parking: every 4 hours
-        scheduleLotReminders(record, vName);
-    }
+    // 新記錄已自動保存提醒相關資料，下次打開 App 時會檢查
 }
 
-function scheduleFreeReminders(record, vName) {
-    const interval = 24 * 60 * 60000; // 24 hours
-    function loop() {
-        const r = getRecords().find(x => x.id === record.id);
-        if (!r || !r.active) return;
-        sendNotification(`${vName} 不收費位提醒`, '你嘅車已泊咗超過24小時，記得留意下');
-        reminderTimers.push(setTimeout(loop, interval));
-    }
-    reminderTimers.push(setTimeout(loop, interval));
-}
-
-function scheduleMeterReminders(record, vName) {
-    const endTime = new Date(record.meterEndTime).getTime();
+function checkAndSendReminders() {
+    // 在 App 打開時檢查是否應該發送提醒
+    const vehicles = getVehicles();
+    const records = getRecords();
     const now = Date.now();
 
-    // 15 min before
-    const warn15 = endTime - 15 * 60000 - now;
-    if (warn15 > 0) {
-        reminderTimers.push(setTimeout(() => {
-            const r = getRecords().find(x => x.id === record.id);
-            if (!r || !r.active) return;
+    records.filter(r => r.active).forEach(r => {
+        const v = vehicles.find(x => x.id === r.vehicleId);
+        const vName = v ? v.name : '你架車';
+
+        if (r.parkType === 'meter' && r.meterEndTime) {
+            checkMeterReminder(r, vName, now);
+        } else if (r.parkType === 'free') {
+            checkFreeReminder(r, vName, now);
+        } else if (r.parkType === 'lot') {
+            checkLotReminder(r, vName, now);
+        }
+    });
+}
+
+function checkMeterReminder(record, vName, now) {
+    const endTime = new Date(record.meterEndTime).getTime();
+    const lastRem = parseInt(record.lastReminderTime || '0');
+    const remInterval = 3600000; // 1小時
+
+    // 15 min before expiry
+    if (endTime - now > 0 && endTime - now <= 15 * 60000) {
+        if (!record.rem15minSent) {
             sendNotification(`${vName} 咪錶提醒`, '仲有15分鐘就夠鐘，記得入標！');
-        }, warn15));
+            record.rem15minSent = true;
+        }
     }
 
-    // At expiry
-    const warnExpiry = endTime - now;
-    if (warnExpiry > 0) {
-        reminderTimers.push(setTimeout(() => {
-            const r = getRecords().find(x => x.id === record.id);
-            if (!r || !r.active) return;
+    // At or after expiry
+    if (endTime - now <= 0) {
+        // Send at expiry (once)
+        if (!record.remExpiryNotified) {
             sendNotification(`${vName} 咪錶已夠鐘！`, '咪錶時間已到，請盡快處理！');
-            // Then every 1 hour after
-            function hourLoop() {
-                const r2 = getRecords().find(x => x.id === record.id);
-                if (!r2 || !r2.active) return;
-                sendNotification(`${vName} 咪錶已夠鐘！`, '咪錶已過期，請盡快處理！');
-                reminderTimers.push(setTimeout(hourLoop, 60 * 60000));
-            }
-            reminderTimers.push(setTimeout(hourLoop, 60 * 60000));
-        }, warnExpiry));
+            record.remExpiryNotified = true;
+            record.lastReminderTime = now.toString();
+        }
+        // Then every 1 hour after
+        else if (now - lastRem >= remInterval) {
+            sendNotification(`${vName} 咪錶已夠鐘！`, '咪錶已過期，請盡快處理！');
+            record.lastReminderTime = now.toString();
+        }
     }
 }
 
-function scheduleLotReminders(record, vName) {
-    const interval = 4 * 60 * 60000; // 4 hours
-    function loop() {
-        const r = getRecords().find(x => x.id === record.id);
-        if (!r || !r.active) return;
-        sendNotification(`${vName} 停車場提醒`, '你嘅車已泊咗一段時間，記得留意');
-        reminderTimers.push(setTimeout(loop, interval));
+function checkFreeReminder(record, vName, now) {
+    const parkTime = new Date(record.timestamp).getTime();
+    const elapsed = now - parkTime;
+    const interval = 24 * 60 * 60000; // 24 hours
+    const lastRem = parseInt(record.lastReminderTime || '0');
+
+    // 首次提醒：泊咗 24 小時後
+    if (elapsed >= interval && !record.freeFistReminder) {
+        sendNotification(`${vName} 不收費位提醒`, '你嘅車已泊咗超過24小時，記得留意下');
+        record.freeFistReminder = true;
+        record.lastReminderTime = now.toString();
     }
-    reminderTimers.push(setTimeout(loop, interval));
+    // 之後每 24 小時提醒一次
+    else if (lastRem > 0 && now - lastRem >= interval) {
+        sendNotification(`${vName} 不收費位提醒`, '你嘅車仍然泊著，記得留意下');
+        record.lastReminderTime = now.toString();
+    }
+}
+
+function checkLotReminder(record, vName, now) {
+    const parkTime = new Date(record.timestamp).getTime();
+    const elapsed = now - parkTime;
+    const interval = 4 * 60 * 60000; // 4 hours
+    const lastRem = parseInt(record.lastReminderTime || '0');
+
+    // 首次提醒：泊咗 4 小時後
+    if (elapsed >= interval && !record.lotFirstReminder) {
+        sendNotification(`${vName} 停車場提醒`, '你嘅車已泊咗一段時間，記得留意');
+        record.lotFirstReminder = true;
+        record.lastReminderTime = now.toString();
+    }
+    // 之後每 4 小時提醒一次
+    else if (lastRem > 0 && now - lastRem >= interval) {
+        sendNotification(`${vName} 停車場提醒`, '你嘅車仍然泊著，記得留意');
+        record.lastReminderTime = now.toString();
+    }
 }
 
 function sendNotification(title, body) {
@@ -1558,6 +1610,8 @@ function getAutoDeleteDays() {
 
 function renderSettings() {
     document.getElementById('autoDeleteSetting').value = getAutoDeleteDays().toString();
+    document.getElementById('autoBackupSetting').value = getAutoBackupDays().toString();
+    renderBackupInfo();
 }
 
 function saveAutoDelete() {
@@ -1580,6 +1634,104 @@ function cleanupOldRecords() {
     });
     if (records.length < before) {
         setRecords(records);
+    }
+}
+
+// ================================================================
+//  DATA BACKUP / EXPORT / IMPORT
+// ================================================================
+function exportData() {
+    const data = {
+        _app: '泊車記錄',
+        _version: 1,
+        _exportedAt: new Date().toISOString(),
+        pk_vehicles: getVehicles(),
+        pk_records: getRecords(),
+        pk_own_locations: getOwnLocations(),
+        pk_auto_delete: localStorage.getItem('pk_auto_delete') || '0',
+        pk_auto_backup: localStorage.getItem('pk_auto_backup') || '0'
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const d = new Date();
+    a.href = url;
+    a.download = `泊車記錄_備份_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    localStorage.setItem('pk_last_backup', Date.now().toString());
+    toast('資料已匯出');
+    renderBackupInfo();
+}
+
+function importData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (!data._app || data._app !== '泊車記錄') {
+                toast('無法識別此備份檔案');
+                return;
+            }
+            const existV = getVehicles().length;
+            const existR = getRecords().length;
+            const importV = (data.pk_vehicles || []).length;
+            const importR = (data.pk_records || []).length;
+            const msg = `將匯入 ${importV} 架車輛、${importR} 條泊車紀錄。\n\n` +
+                        (existV || existR ? `⚠️ 現有資料（${existV} 架車輛、${existR} 條紀錄）將被覆蓋。\n\n` : '') +
+                        '確定匯入？';
+            if (!confirm(msg)) return;
+            if (data.pk_vehicles) setVehicles(data.pk_vehicles);
+            if (data.pk_records) setRecords(data.pk_records);
+            if (data.pk_own_locations) setOwnLocations(data.pk_own_locations);
+            if (data.pk_auto_delete) localStorage.setItem('pk_auto_delete', data.pk_auto_delete);
+            if (data.pk_auto_backup) localStorage.setItem('pk_auto_backup', data.pk_auto_backup);
+            toast('資料匯入成功！');
+            renderSettings();
+            renderHome();
+        } catch (err) {
+            toast('匯入失敗：檔案格式錯誤');
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+}
+
+function getAutoBackupDays() {
+    return parseInt(localStorage.getItem('pk_auto_backup') || '0');
+}
+
+function saveAutoBackup() {
+    const val = document.getElementById('autoBackupSetting').value;
+    localStorage.setItem('pk_auto_backup', val);
+    toast('備份提醒設定已儲存');
+    renderBackupInfo();
+}
+
+function renderBackupInfo() {
+    const el = document.getElementById('lastBackupInfo');
+    if (!el) return;
+    const last = parseInt(localStorage.getItem('pk_last_backup') || '0');
+    if (last > 0) {
+        el.textContent = '上次備份：' + fmtDateTime(new Date(last));
+    } else {
+        el.textContent = '尚未備份過資料';
+    }
+}
+
+function checkBackupReminder() {
+    const days = getAutoBackupDays();
+    if (days <= 0) return;
+    const last = parseInt(localStorage.getItem('pk_last_backup') || '0');
+    const now = Date.now();
+    if (last === 0 || (now - last) > days * 24 * 60 * 60000) {
+        setTimeout(() => {
+            if (confirm('距離上次備份已超過 ' + days + ' 天，建議立即備份資料。\n\n立即匯出備份？')) {
+                exportData();
+            }
+        }, 2000);
     }
 }
 
@@ -1613,18 +1765,31 @@ function toast(msg) { const t = document.getElementById('toast'); t.textContent 
     // Auto-delete old records
     cleanupOldRecords();
 
-    // Re-schedule reminders for active records
-    const records = getRecords();
-    records.filter(r => r.active).forEach(r => scheduleReminders(r));
+    // Check and send reminders (檢查式提醒，而非依賴 setTimeout)
+    checkAndSendReminders();
+
+    // Check backup reminder
+    checkBackupReminder();
 
     // Render home
     renderHome();
 
-    // Auto refresh home every 30 seconds for countdowns
+    // Auto refresh home every 30 seconds for countdowns + check reminders every 5 min
     setInterval(() => {
-        if (currentPage === 'home') renderHome();
-        if (currentPage === 'reminders') renderReminders();
+        if (currentPage === 'home') {
+            renderHome();
+            checkAndSendReminders();
+        }
+        if (currentPage === 'reminders') {
+            renderReminders();
+            checkAndSendReminders();
+        }
     }, 30000);
+
+    // 每 5 分鐘檢查一次提醒（即使在其他頁面）
+    setInterval(() => {
+        checkAndSendReminders();
+    }, 5 * 60 * 1000);
 })();
 </script>
 </body>
