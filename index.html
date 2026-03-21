@@ -295,9 +295,9 @@
             <button class="btn btn-out btn-sm" style="flex:1" onclick="document.getElementById('parkPhotoInputCam').click()">📷 影相</button>
             <button class="btn btn-out btn-sm" style="flex:1" onclick="document.getElementById('parkPhotoInputFile').click()">📁 上載舊相</button>
         </div>
-        <div class="photo-box" id="parkPhotoBox" onclick="document.getElementById('parkPhotoInputCam').click()">
+        <div class="photo-box" id="parkPhotoBox" onclick="document.getElementById('parkPhotoInputFile').click()">
             <div class="ph-ico">📷</div>
-            <div class="ph-txt">點擊影相或上傳</div>
+            <div class="ph-txt">點擊上方按鈕影相或上載</div>
         </div>
         <input type="file" id="parkPhotoInputCam" accept="image/*" capture="environment" onchange="handleParkPhoto(this)">
         <input type="file" id="parkPhotoInputFile" accept="image/*" onchange="handleParkPhoto(this)">
