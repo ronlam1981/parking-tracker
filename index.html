@@ -823,7 +823,6 @@ function startParking(vehicleId) {
     // Reset steps
     document.getElementById('parkStep1').classList.remove('hidden');
     document.getElementById('parkStepOwn').classList.add('hidden');
-    document.getElementById('parkStep2').classList.add('hidden');
     document.getElementById('parkStep3').classList.add('hidden');
     document.querySelectorAll('#parkStep1 .p-type-card').forEach(c => c.classList.remove('sel'));
 
@@ -845,7 +844,6 @@ function selectParkType(type) {
 function showOwnLocStep() {
     document.getElementById('parkStep1').classList.add('hidden');
     document.getElementById('parkStepOwn').classList.remove('hidden');
-    document.getElementById('parkStep2').classList.add('hidden');
     document.getElementById('parkStep3').classList.add('hidden');
 
     const locs = getOwnLocations();
