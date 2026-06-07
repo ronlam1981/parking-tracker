@@ -56,6 +56,7 @@
         .btn-park{background:var(--pri);color:#fff}
         .btn-find{background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0!important}
         .btn-clear{background:#fef2f2;color:var(--danger);border:1px solid #fecaca!important}
+        .btn-done{background:var(--pri);color:#fff}
         .btn-paid{background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0!important}
 
         /* ===== Meter countdown ===== */
@@ -431,8 +432,8 @@
 <!-- ===== Modal: Delete ===== -->
 <div class="modal-bg" id="delModal">
     <div class="modal">
-        <h2>確認刪除</h2>
-        <p id="delMsg">確定要刪除？</p>
+        <h2 id="delModalTitle">確認刪除</h2>
+        <div id="delMsg" style="font-size:14px;color:var(--txt2);line-height:1.6">確定要刪除？</div>
         <div class="modal-acts">
             <button class="btn btn-out" onclick="closeDelModal()">取消</button>
             <button class="btn btn-dn" id="delConfBtn">刪除</button>
@@ -573,7 +574,7 @@ function renderHome() {
                 <div class="v-actions">
                     <button class="btn-find" onclick="findMyCar('${active.id}')">搵返架車</button>
                     ${extraBtns}
-                    <button class="btn-clear" onclick="clearParking('${active.id}')">取消泊車</button>
+                    <button class="btn-done" onclick="clearParking('${active.id}')">已泊完</button>
                 </div>`;
         } else {
             parkingHtml = `<div class="v-parking" style="text-align:center;color:var(--txt2)">未有泊車記錄</div>`;
@@ -1260,21 +1261,52 @@ function sendNotification(title, body) {
 //  CLEAR PARKING
 // ================================================================
 function clearParking(recordId) {
-    document.getElementById('delMsg').textContent = '確定要取消呢個泊車記錄？';
+    const records = getRecords();
+    const r = records.find(x => x.id === recordId);
+    if (!r) return;
+
+    const now = Date.now();
+    const startMs = new Date(r.timestamp).getTime();
+    const totalMin = Math.round((now - startMs) / 60000);
+    const hrs = Math.floor(totalMin / 60);
+    const mins = totalMin % 60;
+    const durationStr = hrs > 0 ? `${hrs} 小時 ${mins} 分鐘` : `${mins} 分鐘`;
+
+    let msgHtml = `已泊 <strong>${durationStr}</strong>`;
+
+    if (r.parkType === 'meter' && r.meterMinutes) {
+        const overstay = totalMin - r.meterMinutes;
+        if (overstay > 0) {
+            msgHtml += `<br><span style="color:var(--danger);font-weight:600">⚠️ 超時 ${overstay} 分鐘（入標 ${r.meterMinutes} 分鐘）</span>`;
+        } else {
+            msgHtml += `<br><span style="color:var(--ok)">✅ 未超時，入標 ${r.meterMinutes} 分鐘，尚餘 ${-overstay} 分鐘</span>`;
+        }
+    } else if (r.parkType === 'lot') {
+        msgHtml += `<br><span style="color:var(--txt2)">💳 請確認已繳交停車場費用</span>`;
+    }
+
+    document.getElementById('delModalTitle').textContent = '確認完成泊車';
+    document.getElementById('delMsg').innerHTML = msgHtml;
+    document.getElementById('delConfBtn').textContent = '確認完成';
+    document.getElementById('delConfBtn').className = 'btn btn-pri';
     document.getElementById('delModal').classList.add('show');
     document.getElementById('delConfBtn').onclick = () => {
-        const records = getRecords();
-        const r = records.find(x => x.id === recordId);
-        if (r) r.active = false;
-        setRecords(records);
+        const recs = getRecords();
+        const rec = recs.find(x => x.id === recordId);
+        if (rec) rec.active = false;
+        setRecords(recs);
         closeDelModal();
         renderHome();
-        toast('已取消泊車');
+        toast('已完成泊車');
     };
 }
 
 function closeDelModal() {
     document.getElementById('delModal').classList.remove('show');
+    document.getElementById('delModalTitle').textContent = '確認刪除';
+    document.getElementById('delMsg').innerHTML = '確定要刪除？';
+    document.getElementById('delConfBtn').textContent = '刪除';
+    document.getElementById('delConfBtn').className = 'btn btn-dn';
 }
 
 // ================================================================
