@@ -506,6 +506,8 @@ function renderHome() {
     const container = document.getElementById('homeVehicles');
     const noVeh = document.getElementById('noVehicles');
 
+    if (!container || !noVeh) return;
+
     if (vehicles.length === 0) {
         container.innerHTML = '';
         noVeh.classList.remove('hidden');
@@ -1788,6 +1790,20 @@ function toast(msg) { const t = document.getElementById('toast'); t.textContent 
     setInterval(() => {
         checkAndSendReminders();
     }, 5 * 60 * 1000);
+
+    // 處理 BFCache 恢復（手機瀏覽器後退/前進緩存）
+    window.addEventListener('pageshow', e => {
+        if (e.persisted) {
+            if (currentPage === 'home') renderHome();
+        }
+    });
+
+    // 處理 PWA 從後台切回前台（iOS Safari / Android Chrome）
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && currentPage === 'home') {
+            renderHome();
+        }
+    });
 })();
 </script>
 </body>
