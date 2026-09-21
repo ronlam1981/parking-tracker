@@ -536,67 +536,71 @@ function renderHome() {
     }
     noVeh.classList.add('hidden');
 
-    container.innerHTML = vehicles.map(v => {
-        // Find latest active parking for this vehicle
-        const active = records.find(r => r.vehicleId === v.id && r.active);
-        const avatar = v.photo
-            ? `<img class="v-avatar" src="${v.photo}" alt="${esc(v.name)}">`
-            : `<div class="v-avatar-placeholder">${v.type === 'car' ? '🚗' : '🏍️'}</div>`;
+    try {
+        container.innerHTML = vehicles.map(v => {
+            // Find latest active parking for this vehicle
+            const active = records.find(r => r.vehicleId === v.id && r.active);
+            const avatar = v.photo
+                ? `<img class="v-avatar" src="${v.photo}" alt="${esc(v.name)}">`
+                : `<div class="v-avatar-placeholder">${v.type === 'car' ? '🚗' : '🏍️'}</div>`;
 
-        const typeLabels = { own: '自己停車場', free: '不收費位', meter: '咪錶位', lot: '公共停車場' };
-        const typeIcons = { own: '🏠', free: '🅿️', meter: '⏰', lot: '🅿️' };
+            const typeLabels = { own: '自己停車場', free: '不收費位', meter: '咪錶位', lot: '公共停車場' };
+            const typeIcons = { own: '🏠', free: '🅿️', meter: '⏰', lot: '🅿️' };
 
-        let parkingHtml = '';
-        let actionsHtml = '';
+            let parkingHtml = '';
+            let actionsHtml = '';
 
-        if (active) {
-            const t = new Date(active.timestamp);
-            const tStr = fmtDateTime(t);
-            const locStr = active.locationDesc ? `📍 ${esc(active.locationDesc)}` : (active.location ? '📍 已記錄GPS位置' : '');
-            const photoHtml = active.photo ? `<img class="v-parking-photo" src="${active.photo}" alt="泊車相片" onclick="viewPhoto('${active.photo}')">` : '';
+            if (active) {
+                const t = new Date(active.timestamp);
+                const tStr = fmtDateTime(t);
+                const locStr = active.locationDesc ? `📍 ${esc(active.locationDesc)}` : (active.location ? '📍 已記錄GPS位置' : '');
+                const photoHtml = active.photo ? `<img class="v-parking-photo" src="${active.photo}" alt="泊車相片" onclick="viewPhoto(this.src)">` : '';
 
-            parkingHtml = `
-                <div class="v-parking">
-                    <div class="v-parking-type">${typeIcons[active.parkType] || ''} ${typeLabels[active.parkType] || active.parkType}</div>
-                    <div class="v-parking-time">泊車時間：${tStr}</div>
-                    ${locStr ? `<div class="v-parking-loc">${locStr}</div>` : ''}
-                    ${photoHtml}
-                    <div id="countdown-${active.id}"></div>
-                    <div id="exit-${active.id}"></div>
-                </div>`;
+                parkingHtml = `
+                    <div class="v-parking">
+                        <div class="v-parking-type">${typeIcons[active.parkType] || ''} ${typeLabels[active.parkType] || active.parkType}</div>
+                        <div class="v-parking-time">泊車時間：${tStr}</div>
+                        ${locStr ? `<div class="v-parking-loc">${locStr}</div>` : ''}
+                        ${photoHtml}
+                        <div id="countdown-${active.id}"></div>
+                        <div id="exit-${active.id}"></div>
+                    </div>`;
 
-            let extraBtns = '';
-            if (active.parkType === 'lot' && !active.exitStarted) {
-                extraBtns = `<button class="btn-paid" onclick="startPaidExit('${active.id}')">已付費離場</button>`;
+                let extraBtns = '';
+                if (active.parkType === 'lot' && !active.exitStarted) {
+                    extraBtns = `<button class="btn-paid" onclick="startPaidExit('${active.id}')">已付費離場</button>`;
+                }
+
+                actionsHtml = `
+                    <div class="v-actions">
+                        <button class="btn-find" onclick="findMyCar('${active.id}')">搵返架車</button>
+                        ${extraBtns}
+                        <button class="btn-done" onclick="clearParking('${active.id}')">已泊完</button>
+                    </div>`;
+            } else {
+                parkingHtml = `<div class="v-parking" style="text-align:center;color:var(--txt2)">未有泊車記錄</div>`;
+                actionsHtml = `
+                    <div class="v-actions">
+                        <button class="btn-park" onclick="startParking('${v.id}')">泊車</button>
+                    </div>`;
             }
 
-            actionsHtml = `
-                <div class="v-actions">
-                    <button class="btn-find" onclick="findMyCar('${active.id}')">搵返架車</button>
-                    ${extraBtns}
-                    <button class="btn-done" onclick="clearParking('${active.id}')">已泊完</button>
-                </div>`;
-        } else {
-            parkingHtml = `<div class="v-parking" style="text-align:center;color:var(--txt2)">未有泊車記錄</div>`;
-            actionsHtml = `
-                <div class="v-actions">
-                    <button class="btn-park" onclick="startParking('${v.id}')">泊車</button>
-                </div>`;
-        }
-
-        return `
-            <div class="card v-status ${v.type === 'motorcycle' ? 'moto' : ''}">
-                <div class="v-head">
-                    ${avatar}
-                    <div class="v-info">
-                        <div class="v-name">${esc(v.name)}</div>
-                        <div class="v-plate">${v.type === 'car' ? '私家車' : '電單車'}${v.plate ? ' · ' + esc(v.plate) : ''}</div>
+            return `
+                <div class="card v-status ${v.type === 'motorcycle' ? 'moto' : ''}">
+                    <div class="v-head">
+                        ${avatar}
+                        <div class="v-info">
+                            <div class="v-name">${esc(v.name)}</div>
+                            <div class="v-plate">${v.type === 'car' ? '私家車' : '電單車'}${v.plate ? ' · ' + esc(v.plate) : ''}</div>
+                        </div>
                     </div>
-                </div>
-                ${parkingHtml}
-                ${actionsHtml}
-            </div>`;
-    }).join('');
+                    ${parkingHtml}
+                    ${actionsHtml}
+                </div>`;
+        }).join('');
+    } catch (e) {
+        container.innerHTML = '<div class="empty"><div class="ico">⚠️</div><p>顯示出錯，請重新整理頁面</p></div>';
+    }
 
     // Start countdowns for active meter/lot/free/exit
     records.filter(r => r.active).forEach(r => {
@@ -1485,7 +1489,7 @@ function renderHistory() {
         const photoHtml = r.photo
             ? (batchMode
                 ? `<img class="rec-photo" src="${r.photo}">`
-                : `<img class="rec-photo" src="${r.photo}" onclick="viewPhoto('${r.photo.substring(0, 50)}')">`)
+                : `<img class="rec-photo" src="${r.photo}" onclick="viewPhoto(this.src)">`)
             : '';
         const locHtml = r.locationDesc ? `<div class="rec-loc">📍 ${esc(r.locationDesc)}</div>` : '';
         const notesHtml = r.notes ? `<div class="rec-notes">${esc(r.notes)}</div>` : '';
