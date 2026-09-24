@@ -205,12 +205,18 @@
         .now-card .now-sub{font-size:12px;opacity:.9;line-height:1.6}
         .now-card .now-more{font-size:12px;opacity:.9;margin-top:10px;border-top:1px solid rgba(255,255,255,.25);padding-top:8px}
         .now-card .now-acts{display:flex;gap:8px;margin-top:12px}
-        .now-card .now-acts button{flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.18);color:#fff}
+        .now-card .now-acts button{flex:1;padding:10px 6px;border:none;border-radius:8px;font-size:12px;font-weight:700;white-space:nowrap;cursor:pointer;background:rgba(255,255,255,.18);color:#fff}
         .now-card .now-acts button.solid{background:#fff;color:var(--pri)}
         .now-card.idle{background:var(--card);color:var(--txt);box-shadow:0 1px 3px rgba(0,0,0,.06)}
         .now-card.idle .now-label{color:var(--txt2);opacity:1}
         .now-card.idle .now-veh{font-size:15px;color:var(--txt)}
         .now-card.over{background:linear-gradient(135deg,#ef4444,#b91c1c);box-shadow:0 4px 14px rgba(239,68,68,.3)}
+        .now-card .now-photo{width:100%;height:auto;border-radius:8px;margin-top:10px}
+        .now-card .meter-countdown{color:#fff!important}
+        .now-card .meter-label{color:rgba(255,255,255,.85)}
+        .now-card .bar-bg{background:rgba(255,255,255,.3)}
+        .now-card .exit-box{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.4)}
+        .now-card .exit-box .exit-time,.now-card .exit-box .exit-label{color:#fff}
         .v-status .v-parking-elapsed{font-size:12px;color:var(--pri);font-weight:600;margin-top:2px}
 
         /* ===== Misc ===== */
@@ -587,54 +593,30 @@ function renderHome() {
     renderHomeNow(vehicles, records);
 
     try {
-        container.innerHTML = vehicles.map(v => {
-            // Find latest active parking for this vehicle
-            const active = records.find(r => r.vehicleId === v.id && r.active);
+        // 泊緊嘅車已經喺上面嘅大卡顯示，呢度淨係列未泊車嘅車
+        const idleVehicles = vehicles.filter(v => !records.some(r => r.vehicleId === v.id && r.active));
+
+        if (idleVehicles.length === 0) {
+            container.innerHTML = '';
+        } else {
+        const heading = idleVehicles.length < vehicles.length
+            ? '<p class="section-title" style="margin-top:4px">未泊車</p>'
+            : '';
+        container.innerHTML = heading + idleVehicles.map(v => {
             const avatar = v.photo
                 ? `<img class="v-avatar" src="${v.photo}" alt="${esc(v.name)}">`
                 : `<div class="v-avatar-placeholder">${v.type === 'car' ? '🚗' : '🏍️'}</div>`;
 
-            const typeLabels = { own: '自己停車場', free: '不收費位', meter: '咪錶位', lot: '公共停車場' };
-            const typeIcons = { own: '🏠', free: '🅿️', meter: '⏰', lot: '🅿️' };
+            const last = records.find(r => r.vehicleId === v.id);
+            const lastStr = last
+                ? `上次泊車：${fmtDateTime(new Date(last.timestamp))}`
+                : '未有泊車記錄';
 
-            let parkingHtml = '';
-            let actionsHtml = '';
-
-            if (active) {
-                const t = new Date(active.timestamp);
-                const tStr = fmtDateTime(t);
-                const locStr = active.locationDesc ? `📍 ${esc(active.locationDesc)}` : (active.location ? '📍 已記錄GPS位置' : '');
-                const photoHtml = active.photo ? `<img class="v-parking-photo" src="${active.photo}" alt="泊車相片" onclick="viewPhoto(this.src)">` : '';
-
-                parkingHtml = `
-                    <div class="v-parking">
-                        <div class="v-parking-type">${typeIcons[active.parkType] || ''} ${typeLabels[active.parkType] || active.parkType}</div>
-                        <div class="v-parking-time">泊車時間：${tStr}</div>
-                        <div class="v-parking-elapsed js-elapsed" data-since="${t.getTime()}">已泊 ${fmtElapsed(Date.now() - t.getTime())}</div>
-                        ${locStr ? `<div class="v-parking-loc">${locStr}</div>` : ''}
-                        ${photoHtml}
-                        <div id="countdown-${active.id}"></div>
-                        <div id="exit-${active.id}"></div>
-                    </div>`;
-
-                let extraBtns = '';
-                if (active.parkType === 'lot' && !active.exitStarted) {
-                    extraBtns = `<button class="btn-paid" onclick="startPaidExit('${active.id}')">已付費離場</button>`;
-                }
-
-                actionsHtml = `
-                    <div class="v-actions">
-                        <button class="btn-find" onclick="findMyCar('${active.id}')">搵返架車</button>
-                        ${extraBtns}
-                        <button class="btn-done" onclick="clearParking('${active.id}')">已泊完</button>
-                    </div>`;
-            } else {
-                parkingHtml = `<div class="v-parking" style="text-align:center;color:var(--txt2)">未有泊車記錄</div>`;
-                actionsHtml = `
+            const parkingHtml = `<div class="v-parking" style="text-align:center;color:var(--txt2)">${lastStr}</div>`;
+            const actionsHtml = `
                     <div class="v-actions">
                         <button class="btn-park" onclick="startParking('${v.id}')">泊車</button>
                     </div>`;
-            }
 
             return `
                 <div class="card v-status ${v.type === 'motorcycle' ? 'moto' : ''}">
@@ -649,6 +631,7 @@ function renderHome() {
                     ${actionsHtml}
                 </div>`;
         }).join('');
+        }
     } catch (e) {
         console.error('renderHome 出錯', e);
         container.innerHTML = `<div class="empty"><div class="ico">⚠️</div><p>顯示出錯，請重新整理頁面</p><p style="font-size:11px;margin-top:8px">${esc(e && e.message ? e.message : String(e))}</p></div>`;
@@ -667,7 +650,7 @@ function renderHome() {
     });
 }
 
-// 首頁頂部：最新泊車情況
+// 首頁頂部：每架泊緊嘅車各一張卡（最新嗰架喺最上）
 function renderHomeNow(vehicles, records) {
     const box = document.getElementById('homeNow');
     if (!box) return;
@@ -679,51 +662,56 @@ function renderHomeNow(vehicles, records) {
     if (actives.length === 0) {
         box.innerHTML = `
             <div class="now-card idle">
-                <div class="now-label">最新泊車情況</div>
+                <div class="now-label">泊車情況</div>
                 <div class="now-veh">🅿️ 目前冇車泊緊</div>
                 <div class="now-sub" style="margin-top:6px;color:var(--txt2)">喺下面揀架車，㩒「泊車」就會即刻喺呢度顯示。</div>
             </div>`;
         return;
     }
 
-    const r = actives[0];
-    const v = vehicles.find(x => x.id === r.vehicleId);
-    const vName = v ? v.name : '未知車輛';
     const typeLabels = { own: '自己停車場', free: '不收費位', meter: '咪錶位', lot: '公共停車場' };
     const typeIcons = { own: '🏠', free: '🅿️', meter: '⏰', lot: '🅿️' };
-    const t = new Date(r.timestamp);
 
-    // 咪錶是否已過期（決定卡片顏色）
-    const expired = r.parkType === 'meter' && r.meterEndTime && new Date(r.meterEndTime).getTime() <= Date.now();
+    const heading = `<p class="section-title" style="margin-bottom:8px">🚗 泊緊（${actives.length}）</p>`;
 
-    const locStr = r.locationDesc
-        ? `📍 ${esc(r.locationDesc)}`
-        : (r.location ? '📍 已記錄GPS位置' : '📍 未有位置資料');
+    box.innerHTML = heading + actives.map((r, idx) => {
+        const v = vehicles.find(x => x.id === r.vehicleId);
+        const vName = v ? v.name : '未知車輛';
+        const t = new Date(r.timestamp);
 
-    let meterLine = '';
-    if (r.parkType === 'meter' && r.meterEndTime) {
-        meterLine = `<div class="now-sub js-meterline" data-end="${new Date(r.meterEndTime).getTime()}"></div>`;
-    }
+        // 咪錶過期就成張卡轉紅
+        const expired = r.parkType === 'meter' && r.meterEndTime && new Date(r.meterEndTime).getTime() <= Date.now();
 
-    const moreLine = actives.length > 1
-        ? `<div class="now-more">另有 ${actives.length - 1} 架車泊緊（見下面）</div>`
-        : '';
+        const locStr = r.locationDesc
+            ? `📍 ${esc(r.locationDesc)}`
+            : (r.location ? '📍 已記錄GPS位置' : '📍 未有位置資料');
 
-    box.innerHTML = `
+        const photoHtml = r.photo
+            ? `<img class="now-photo" src="${r.photo}" alt="泊車相片" onclick="viewPhoto(this.src)">`
+            : '';
+
+        const extraBtn = (r.parkType === 'lot' && !r.exitStarted)
+            ? `<button onclick="startPaidExit('${r.id}')">💳 已付費離場</button>`
+            : '';
+
+        return `
         <div class="now-card ${expired ? 'over' : ''}">
-            <div class="now-label">最新泊車情況</div>
+            ${idx === 0 && actives.length > 1 ? '<div class="now-label">最新</div>' : ''}
             <div class="now-veh">${typeIcons[r.parkType] || '🅿️'} ${esc(vName)}</div>
             <div class="now-type">${typeLabels[r.parkType] || esc(r.parkType)}${v && v.plate ? ' · ' + esc(v.plate) : ''}</div>
             <div class="now-elapsed js-elapsed" data-since="${t.getTime()}">${fmtElapsed(Date.now() - t.getTime())}</div>
             <div class="now-sub">由 ${fmtDateTime(t)} 開始</div>
             <div class="now-sub">${locStr}</div>
-            ${meterLine}
-            ${moreLine}
+            ${photoHtml}
+            <div id="countdown-${r.id}"></div>
+            <div id="exit-${r.id}"></div>
             <div class="now-acts">
                 <button onclick="findMyCar('${r.id}')">🧭 搵返架車</button>
+                ${extraBtn}
                 <button class="solid" onclick="clearParking('${r.id}')">✅ 已泊完</button>
             </div>
         </div>`;
+    }).join('');
 }
 
 function fmtElapsed(ms) {
@@ -742,14 +730,6 @@ function startElapsedTicker() {
             if (!since) return;
             const txt = fmtElapsed(now - since);
             el.textContent = el.classList.contains('now-elapsed') ? txt : '已泊 ' + txt;
-        });
-        document.querySelectorAll('#pg-home .js-meterline').forEach(el => {
-            const end = parseInt(el.dataset.end || '0');
-            if (!end) return;
-            const diff = end - now;
-            el.textContent = diff > 0
-                ? `⏰ 入標剩餘 ${fmtElapsed(diff)}`
-                : `⚠️ 咪錶已過期 ${fmtElapsed(-diff)}`;
         });
     }
     update();
@@ -1257,7 +1237,7 @@ function handleParkPhoto(input) {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async e => {
-        const compressed = await compressPhoto(e.target.result, 1200, 0.85);
+        const compressed = await compressPhoto(e.target.result, 800, 0.7);
         parkState.photo = compressed;
         const box = document.getElementById('parkPhotoBox');
         box.classList.add('has');
