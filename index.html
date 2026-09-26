@@ -198,10 +198,21 @@
 
         /* ===== Now Card (最新泊車情況) ===== */
         .now-card{background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border-radius:var(--r);padding:16px;margin-bottom:14px;box-shadow:0 4px 14px rgba(37,99,235,.28)}
+        .now-card{padding:12px 14px}
+        .now-card .now-head{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+        .now-card .now-thumb{width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0;border:1px solid rgba(255,255,255,.35)}
+        .now-card .now-thumb.ph{display:flex;align-items:center;justify-content:center;font-size:22px;background:rgba(255,255,255,.18)}
+        .now-card .now-hinfo{flex:1;min-width:0}
+        .now-card .now-hinfo .now-veh,.now-card .now-hinfo .now-type{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .now-card .now-tag{font-size:10px;font-weight:600;background:rgba(255,255,255,.25);border-radius:4px;padding:1px 5px;margin-left:6px;vertical-align:middle}
+        .now-card .now-right{text-align:right;flex-shrink:0}
+        .now-card .now-badge{font-size:11px;opacity:.95;margin-top:2px;white-space:nowrap}
+        .now-card .now-arrow{font-size:14px;opacity:.8;flex-shrink:0;width:14px;text-align:center}
+        .now-card .now-body{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.25)}
         .now-card .now-label{font-size:12px;opacity:.85;letter-spacing:1px;margin-bottom:8px}
         .now-card .now-veh{font-size:18px;font-weight:800;display:flex;align-items:center;gap:8px}
         .now-card .now-type{font-size:13px;opacity:.9;margin-top:2px}
-        .now-card .now-elapsed{font-size:30px;font-weight:800;margin:10px 0 2px;font-variant-numeric:tabular-nums}
+        .now-card .now-elapsed{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.2}
         .now-card .now-sub{font-size:12px;opacity:.9;line-height:1.6}
         .now-card .now-more{font-size:12px;opacity:.9;margin-top:10px;border-top:1px solid rgba(255,255,255,.25);padding-top:8px}
         .now-card .now-acts{display:flex;gap:8px;margin-top:12px}
@@ -210,6 +221,7 @@
         .now-card.idle{background:var(--card);color:var(--txt);box-shadow:0 1px 3px rgba(0,0,0,.06)}
         .now-card.idle .now-label{color:var(--txt2);opacity:1}
         .now-card.idle .now-veh{font-size:15px;color:var(--txt)}
+        .now-card.idle{padding:16px}
         .now-card.over{background:linear-gradient(135deg,#ef4444,#b91c1c);box-shadow:0 4px 14px rgba(239,68,68,.3)}
         .now-card .now-photo{width:100%;height:auto;border-radius:8px;margin-top:10px}
         .now-card .meter-countdown{color:#fff!important}
@@ -677,40 +689,90 @@ function renderHomeNow(vehicles, records) {
         const v = vehicles.find(x => x.id === r.vehicleId);
         const vName = v ? v.name : '未知車輛';
         const t = new Date(r.timestamp);
+        const open = expandedCards.has(r.id);
 
         // 咪錶過期就成張卡轉紅
-        const expired = r.parkType === 'meter' && r.meterEndTime && new Date(r.meterEndTime).getTime() <= Date.now();
+        const endMs = (r.parkType === 'meter' && r.meterEndTime) ? new Date(r.meterEndTime).getTime() : 0;
+        const expired = endMs > 0 && endMs <= Date.now();
+
+        // 縮圖：優先用泊車相片，其次車輛相片，都冇就用 emoji
+        const thumbSrc = r.photo || (v && v.photo) || '';
+        const thumb = thumbSrc
+            ? `<img class="now-thumb" src="${thumbSrc}" alt="">`
+            : `<div class="now-thumb ph">${v && v.type === 'motorcycle' ? '🏍️' : '🚗'}</div>`;
+
+        // 摺疊時仍然睇到嘅咪錶狀態
+        const badge = endMs > 0
+            ? `<div class="now-badge js-meterbadge" data-end="${endMs}">${fmtMeterBadge(endMs)}</div>`
+            : '';
 
         const locStr = r.locationDesc
             ? `📍 ${esc(r.locationDesc)}`
             : (r.location ? '📍 已記錄GPS位置' : '📍 未有位置資料');
 
         const photoHtml = r.photo
-            ? `<img class="now-photo" src="${r.photo}" alt="泊車相片" onclick="viewPhoto(this.src)">`
+            ? `<img class="now-photo" src="${r.photo}" alt="泊車相片" onclick="event.stopPropagation();viewPhoto(this.src)">`
             : '';
 
         const extraBtn = (r.parkType === 'lot' && !r.exitStarted)
             ? `<button onclick="startPaidExit('${r.id}')">💳 已付費離場</button>`
             : '';
 
+        // 摺疊時唔畫詳情，慳位又快
+        const body = open ? `
+            <div class="now-body">
+                <div class="now-sub">由 ${fmtDateTime(t)} 開始</div>
+                <div class="now-sub">${locStr}</div>
+                ${r.notes ? `<div class="now-sub">📝 ${esc(r.notes)}</div>` : ''}
+                ${photoHtml}
+                <div id="countdown-${r.id}"></div>
+                <div id="exit-${r.id}"></div>
+                <div class="now-acts">
+                    <button onclick="findMyCar('${r.id}')">🧭 搵返架車</button>
+                    ${extraBtn}
+                    <button class="solid" onclick="clearParking('${r.id}')">✅ 已泊完</button>
+                </div>
+            </div>` : '';
+
         return `
-        <div class="now-card ${expired ? 'over' : ''}">
-            ${idx === 0 && actives.length > 1 ? '<div class="now-label">最新</div>' : ''}
-            <div class="now-veh">${typeIcons[r.parkType] || '🅿️'} ${esc(vName)}</div>
-            <div class="now-type">${typeLabels[r.parkType] || esc(r.parkType)}${v && v.plate ? ' · ' + esc(v.plate) : ''}</div>
-            <div class="now-elapsed js-elapsed" data-since="${t.getTime()}">${fmtElapsed(Date.now() - t.getTime())}</div>
-            <div class="now-sub">由 ${fmtDateTime(t)} 開始</div>
-            <div class="now-sub">${locStr}</div>
-            ${photoHtml}
-            <div id="countdown-${r.id}"></div>
-            <div id="exit-${r.id}"></div>
-            <div class="now-acts">
-                <button onclick="findMyCar('${r.id}')">🧭 搵返架車</button>
-                ${extraBtn}
-                <button class="solid" onclick="clearParking('${r.id}')">✅ 已泊完</button>
+        <div class="now-card ${expired ? 'over' : ''} ${open ? 'open' : ''}">
+            <div class="now-head" onclick="toggleNowCard('${r.id}')">
+                ${thumb}
+                <div class="now-hinfo">
+                    <div class="now-veh">${esc(vName)}${idx === 0 && actives.length > 1 ? '<span class="now-tag">最新</span>' : ''}</div>
+                    <div class="now-type">${typeIcons[r.parkType] || '🅿️'} ${typeLabels[r.parkType] || esc(r.parkType)}${v && v.plate ? ' · ' + esc(v.plate) : ''}</div>
+                </div>
+                <div class="now-right">
+                    <div class="now-elapsed js-elapsed" data-since="${t.getTime()}" data-fmt="short">${fmtElapsedShort(Date.now() - t.getTime())}</div>
+                    ${badge}
+                </div>
+                <div class="now-arrow">${open ? '▴' : '▾'}</div>
             </div>
+            ${body}
         </div>`;
     }).join('');
+}
+
+// 記住邊張卡展開咗（每次重開 App 自動摺疊返）
+const expandedCards = new Set();
+
+function toggleNowCard(id) {
+    if (expandedCards.has(id)) expandedCards.delete(id);
+    else expandedCards.add(id);
+    renderHome();
+}
+
+function fmtElapsedShort(ms) {
+    const total = Math.max(0, Math.floor(ms / 60000));
+    const h = Math.floor(total / 60), m = total % 60;
+    if (h >= 24) return `${Math.floor(h / 24)}日${h % 24}時`;
+    if (h > 0) return `${h}時${m}分`;
+    return `${m}分`;
+}
+
+function fmtMeterBadge(endMs) {
+    const diff = endMs - Date.now();
+    return diff > 0 ? `剩 ${fmtElapsedShort(diff)}` : `⚠️ 過期 ${fmtElapsedShort(-diff)}`;
 }
 
 function fmtElapsed(ms) {
@@ -727,8 +789,13 @@ function startElapsedTicker() {
         document.querySelectorAll('#pg-home .js-elapsed').forEach(el => {
             const since = parseInt(el.dataset.since || '0');
             if (!since) return;
-            const txt = fmtElapsed(now - since);
-            el.textContent = el.classList.contains('now-elapsed') ? txt : '已泊 ' + txt;
+            el.textContent = el.dataset.fmt === 'short'
+                ? fmtElapsedShort(now - since)
+                : '已泊 ' + fmtElapsed(now - since);
+        });
+        document.querySelectorAll('#pg-home .js-meterbadge').forEach(el => {
+            const end = parseInt(el.dataset.end || '0');
+            if (end) el.textContent = fmtMeterBadge(end);
         });
     }
     update();
