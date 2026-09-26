@@ -323,6 +323,7 @@
             <div class="co" id="parkLocCo">—</div>
             <a id="parkLocLink" href="#" target="_blank" style="display:none">在地圖查看</a>
         </div>
+        <div id="parkPhotoGps" class="hidden"></div>
         <button class="btn btn-out btn-sm" onclick="getParkLocation()" style="margin-bottom:14px;width:auto">重新定位</button>
 
         <p class="section-title" id="parkTimeLabel">泊車時間</p>
@@ -571,6 +572,7 @@ function showPage(id) {
     }
     if (id === 'vehicles') { renderVehicles(); document.getElementById('hdrTitle').textContent = '管理車輛'; }
     if (id === 'park') { document.getElementById('hdrTitle').textContent = '泊車'; }
+    else { stopLocWatch(); }
     if (id === 'settings') { renderSettings(); document.getElementById('hdrTitle').textContent = '設定'; }
     window.scrollTo(0, 0);
 }
@@ -1036,6 +1038,7 @@ let parkState = {
     parkType: null,
     meterMinutes: null,
     location: null,
+    photoLocation: null,
     photo: null,
     timeOffsetMin: 0
 };
@@ -1045,7 +1048,7 @@ function startParking(vehicleId) {
     const v = vehicles.find(x => x.id === vehicleId);
     if (!v) return;
 
-    parkState = { vehicleId: v.id, vehicleType: v.type, parkType: null, meterMinutes: null, location: null, photo: null, timeOffsetMin: 0 };
+    parkState = { vehicleId: v.id, vehicleType: v.type, parkType: null, meterMinutes: null, location: null, photoLocation: null, photo: null, timeOffsetMin: 0 };
     document.getElementById('parkVehicleName').textContent = `${v.name} — 泊車`;
 
     // Reset steps
@@ -1229,6 +1232,8 @@ function showDetailsStep() {
     // Reset
     parkState.photo = null;
     parkState.location = null;
+    parkState.photoLocation = null;
+    renderPhotoGpsBox();
     parkState.timeOffsetMin = 0;
     parkState.meterMinutes = 0;
     const box = document.getElementById('parkPhotoBox');
@@ -1286,36 +1291,225 @@ function parkBack(step) {
     }
 }
 
-// Park location
-function getParkLocation() {
+// ================================================================
+//  定位：一開始就取，然後持續修正，直到夠準（或 20 秒）
+// ================================================================
+let locWatchId = null, locTimer = null;
+
+function stopLocWatch() {
+    if (locWatchId !== null && navigator.geolocation) {
+        try { navigator.geolocation.clearWatch(locWatchId); } catch (e) {}
+    }
+    locWatchId = null;
+    if (locTimer) { clearTimeout(locTimer); locTimer = null; }
+}
+
+function showParkLoc(loc, msg) {
     const st = document.getElementById('parkLocSt');
     const co = document.getElementById('parkLocCo');
     const link = document.getElementById('parkLocLink');
-    st.textContent = '正在定位...';
-    co.textContent = '—';
-    link.style.display = 'none';
+    if (!st || !co || !link) return;
 
-    if (!navigator.geolocation) { st.textContent = '裝置唔支援定位'; return; }
-
-    navigator.geolocation.getCurrentPosition(pos => {
-        parkState.location = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
-        st.textContent = '已定位 ✓';
-        co.textContent = `${parkState.location.lat.toFixed(6)}, ${parkState.location.lng.toFixed(6)}`;
-        link.href = `https://maps.google.com/?q=${parkState.location.lat},${parkState.location.lng}`;
+    st.textContent = msg;
+    if (loc) {
+        co.textContent = `${loc.lat.toFixed(6)}, ${loc.lng.toFixed(6)}`;
+        link.href = `https://maps.google.com/?q=${loc.lat},${loc.lng}`;
         link.style.display = 'inline';
-    }, err => {
-        st.textContent = '無法定位';
-        co.textContent = err.code === 1 ? '請允許定位權限' : '定位失敗，請重試';
-    }, { enableHighAccuracy: true, timeout: 10000 });
+    } else {
+        co.textContent = '—';
+        link.style.display = 'none';
+    }
+}
+
+function getParkLocation() {
+    stopLocWatch();
+    showParkLoc(null, '正在定位...');
+
+    if (!navigator.geolocation) {
+        showParkLoc(null, '裝置唔支援定位');
+        return;
+    }
+
+    let best = null;
+    const apply = pos => {
+        const c = pos.coords;
+        const acc = Math.round(c.accuracy || 9999);
+        // 只接受比之前更準嘅結果
+        if (best && best.accuracy <= acc) return;
+        best = { lat: c.latitude, lng: c.longitude, accuracy: acc, source: 'gps' };
+        parkState.location = best;
+        showParkLoc(best, acc <= 100 ? `已定位 ✓（±${acc} 米）` : `已定位（±${acc} 米，較粗略）`);
+        if (acc <= 20) stopLocWatch();   // 夠準就收手，慳電
+    };
+
+    const fail = err => {
+        stopLocWatch();
+        if (parkState.location) return;  // 已經有相片位置就唔好覆蓋提示
+        showParkLoc(null, '無法定位');
+        const co = document.getElementById('parkLocCo');
+        if (co) co.textContent = err && err.code === 1
+            ? '請喺「設定 → Safari → 位置」允許定位，或上載一張有位置資料嘅相'
+            : '定位失敗，可㩒「重新定位」或上載有位置資料嘅相';
+    };
+
+    // 先攞一個快嘅粗略位置，唔使等
+    navigator.geolocation.getCurrentPosition(apply, () => {}, { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 });
+    // 同時持續攞高精度位置修正
+    locWatchId = navigator.geolocation.watchPosition(apply, fail, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+    locTimer = setTimeout(stopLocWatch, 20000);
+}
+
+// ================================================================
+//  讀取相片內嵌嘅 GPS（EXIF）
+//  相片經壓縮後 EXIF 會冇咗，所以一定要喺壓縮前讀原檔
+// ================================================================
+function readExifGps(file) {
+    return new Promise(resolve => {
+        try {
+            const reader = new FileReader();
+            reader.onerror = () => resolve(null);
+            reader.onload = () => {
+                try { resolve(parseExifGps(new DataView(reader.result))); }
+                catch (e) { console.warn('EXIF 解析失敗', e); resolve(null); }
+            };
+            reader.readAsArrayBuffer(file.slice(0, 256 * 1024));
+        } catch (e) { resolve(null); }
+    });
+}
+
+function parseExifGps(view) {
+    if (view.byteLength < 8 || view.getUint16(0) !== 0xFFD8) return null;  // 唔係 JPEG
+    let off = 2;
+    while (off + 4 <= view.byteLength) {
+        if (view.getUint8(off) !== 0xFF) return null;
+        const marker = view.getUint8(off + 1);
+        if (marker === 0xDA || marker === 0xD9) return null;  // 到影像資料，冇 EXIF
+        const size = view.getUint16(off + 2);
+        if (marker === 0xE1) {
+            const start = off + 4;
+            if (start + 6 > view.byteLength) return null;
+            if (view.getUint32(start) !== 0x45786966) return null;  // "Exif"
+            return parseTiffGps(view, start + 6);
+        }
+        off += 2 + size;
+    }
+    return null;
+}
+
+function parseTiffGps(view, tiff) {
+    if (tiff + 8 > view.byteLength) return null;
+    const le = view.getUint16(tiff) === 0x4949;          // II = little endian
+    const u16 = o => view.getUint16(o, le);
+    const u32 = o => view.getUint32(o, le);
+    if (u16(tiff + 2) !== 0x002A) return null;
+
+    const ifd0 = tiff + u32(tiff + 4);
+    if (ifd0 + 2 > view.byteLength) return null;
+
+    let gpsIfd = 0;
+    const n0 = u16(ifd0);
+    for (let i = 0; i < n0; i++) {
+        const e = ifd0 + 2 + i * 12;
+        if (e + 12 > view.byteLength) break;
+        if (u16(e) === 0x8825) { gpsIfd = tiff + u32(e + 8); break; }   // GPS IFD 指標
+    }
+    if (!gpsIfd || gpsIfd + 2 > view.byteLength) return null;
+
+    const tags = {};
+    const n = u16(gpsIfd);
+    for (let i = 0; i < n; i++) {
+        const e = gpsIfd + 2 + i * 12;
+        if (e + 12 > view.byteLength) break;
+        const tag = u16(e), type = u16(e + 2), cnt = u32(e + 4);
+        const inline = (type === 2 && cnt <= 4);
+        const valOff = inline ? e + 8 : tiff + u32(e + 8);
+        if (valOff >= view.byteLength) continue;
+        if (type === 2) {
+            tags[tag] = String.fromCharCode(view.getUint8(valOff));      // N / S / E / W
+        } else if (type === 5 && cnt >= 3) {
+            const arr = [];
+            for (let k = 0; k < 3; k++) {
+                const o = valOff + k * 8;
+                if (o + 8 > view.byteLength) return null;
+                const num = u32(o), den = u32(o + 4);
+                arr.push(den ? num / den : 0);
+            }
+            tags[tag] = arr;
+        }
+    }
+
+    const dms = a => (Array.isArray(a) && a.length >= 3) ? a[0] + a[1] / 60 + a[2] / 3600 : null;
+    let lat = dms(tags[2]), lng = dms(tags[4]);
+    if (lat === null || lng === null) return null;
+    if (tags[1] === 'S') lat = -lat;
+    if (tags[3] === 'W') lng = -lng;
+    if (!isFinite(lat) || !isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+    if (lat === 0 && lng === 0) return null;
+    return { lat, lng, accuracy: null, source: 'photo' };
+}
+
+// 兩點之間距離（米）
+function distanceMeters(a, b) {
+    const R = 6371000, rad = x => x * Math.PI / 180;
+    const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
+    const s = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+    return Math.round(2 * R * Math.asin(Math.sqrt(s)));
+}
+
+function usePhotoLocation() {
+    if (!parkState.photoLocation) return;
+    stopLocWatch();                       // 唔好再被 GPS 覆蓋
+    parkState.location = parkState.photoLocation;
+    showParkLoc(parkState.location, '已用相片位置 📷✓');
+    renderPhotoGpsBox();
+    toast('已改用相片內嘅位置');
+}
+
+function renderPhotoGpsBox() {
+    const box = document.getElementById('parkPhotoGps');
+    if (!box) return;
+    const pl = parkState.photoLocation;
+
+    if (!pl) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+    box.classList.remove('hidden');
+
+    const using = parkState.location && parkState.location.source === 'photo';
+    if (using) {
+        box.innerHTML = `<div style="font-size:12px;color:var(--ok);margin-bottom:8px">📷 正在使用相片內嘅位置</div>`;
+        return;
+    }
+
+    const dist = parkState.location ? distanceMeters(parkState.location, pl) : null;
+    box.innerHTML = `
+        <div style="font-size:12px;color:var(--txt2);margin-bottom:8px">
+            📷 相片內含位置資料${dist !== null ? `（同現時定位相距 ${dist} 米）` : ''}
+            <button class="btn btn-out btn-sm" onclick="usePhotoLocation()" style="width:auto;margin-left:6px;padding:4px 10px;font-size:12px">改用相片位置</button>
+        </div>`;
 }
 
 // Park photo
 function handleParkPhoto(input) {
     const file = input.files[0];
     if (!file) return;
+
+    // 先喺原檔讀 GPS（壓縮後 EXIF 就冇咗）
+    readExifGps(file).then(gps => {
+        if (!gps) { parkState.photoLocation = null; renderPhotoGpsBox(); return; }
+        parkState.photoLocation = gps;
+        // 未有定位（或定位失敗）就自動採用相片位置
+        if (!parkState.location) {
+            stopLocWatch();
+            parkState.location = gps;
+            showParkLoc(gps, '已用相片位置 📷✓');
+            toast('已自動讀取相片內嘅位置');
+        }
+        renderPhotoGpsBox();
+    });
+
     const reader = new FileReader();
     reader.onload = async e => {
         const compressed = await compressPhoto(e.target.result, 800, 0.7);
+        if (!compressed) { toast('相片讀取失敗，請換一張或改用「影相」'); return; }
         parkState.photo = compressed;
         const box = document.getElementById('parkPhotoBox');
         box.classList.add('has');
@@ -1366,6 +1560,8 @@ function saveParkRecord() {
         toast('儲存失敗：裝置儲存空間不足，請先喺「記錄」刪除舊記錄');
         return;
     }
+
+    stopLocWatch();
 
     // Schedule reminders
     scheduleReminders(record);
@@ -1622,6 +1818,7 @@ function handleVehPhoto(input) {
     const reader = new FileReader();
     reader.onload = async e => {
         const compressed = await compressPhoto(e.target.result, 400, 0.8);
+        if (!compressed) { toast('相片讀取失敗，請換一張'); return; }
         vehPhotoData = compressed;
         const box = document.getElementById('vehPhotoBox');
         box.classList.add('has');
@@ -2009,8 +2206,11 @@ function compressPhoto(dataUrl, maxWidth, quality) {
             canvas.height = h;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, w, h);
-            resolve(canvas.toDataURL('image/jpeg', quality));
+            try { resolve(canvas.toDataURL('image/jpeg', quality)); }
+            catch (e) { console.error('相片壓縮失敗', e); resolve(null); }
         };
+        // 相片解碼失敗（壞檔、格式唔支援、記憶體不足）要回報，唔好永遠卡住
+        img.onerror = () => { console.warn('相片讀取失敗'); resolve(null); };
         img.src = dataUrl;
     });
 }
