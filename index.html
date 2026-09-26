@@ -590,9 +590,8 @@ function renderHome() {
     }
     noVeh.classList.add('hidden');
 
-    renderHomeNow(vehicles, records);
-
     try {
+        renderHomeNow(vehicles, records);
         // 泊緊嘅車已經喺上面嘅大卡顯示，呢度淨係列未泊車嘅車
         const idleVehicles = vehicles.filter(v => !records.some(r => r.vehicleId === v.id && r.active));
 
@@ -634,10 +633,11 @@ function renderHome() {
         }
     } catch (e) {
         console.error('renderHome 出錯', e);
-        container.innerHTML = `<div class="empty"><div class="ico">⚠️</div><p>顯示出錯，請重新整理頁面</p><p style="font-size:11px;margin-top:8px">${esc(e && e.message ? e.message : String(e))}</p></div>`;
+        showErrorBar('首頁顯示出錯：' + (e && e.message ? e.message : String(e)));
+        container.innerHTML = `<div class="empty"><div class="ico">⚠️</div><p>顯示出錯，請㩒下面「重新載入」</p><p style="font-size:11px;margin-top:8px">${esc(e && e.message ? e.message : String(e))}</p></div>`;
     }
 
-    startElapsedTicker();
+    try { startElapsedTicker(); } catch (e) { console.error(e); }
 
     // Start countdowns for active meter/lot/free/exit
     records.filter(r => r.active).forEach(r => {
@@ -2046,6 +2046,48 @@ function fmtTime(d) { return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
 function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
 
 // ================================================================
+//  白畫面守護（出錯唔會靜靜咁空白，同埋會自動補救）
+// ================================================================
+function showErrorBar(msg) {
+    let bar = document.getElementById('errBar');
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'errBar';
+        bar.style.cssText = 'position:fixed;left:0;right:0;bottom:60px;z-index:200;background:#fef2f2;border-top:2px solid #ef4444;color:#991b1b;padding:10px 14px;font-size:12px;line-height:1.5';
+        document.body.appendChild(bar);
+    }
+    bar.innerHTML = `<div style="margin-bottom:6px">⚠️ ${esc(msg)}</div>
+        <button onclick="location.reload()" style="padding:6px 12px;border:none;border-radius:6px;background:#ef4444;color:#fff;font-size:12px;font-weight:600">重新載入</button>
+        <button onclick="document.getElementById('errBar').remove()" style="padding:6px 12px;border:none;border-radius:6px;background:#e2e8f0;color:#334155;font-size:12px;margin-left:6px">關閉</button>`;
+}
+
+// 如果首頁應該有嘢但實際上係空白，自動再畫一次
+function homeWatchdog() {
+    if (currentPage !== 'home') return;
+    const nowBox = document.getElementById('homeNow');
+    const container = document.getElementById('homeVehicles');
+    const noVeh = document.getElementById('noVehicles');
+    if (!nowBox || !container || !noVeh) return;
+
+    const blank = !nowBox.innerHTML.trim()
+        && !container.innerHTML.trim()
+        && noVeh.classList.contains('hidden');
+
+    if (blank) {
+        console.warn('首頁空白，自動重新顯示');
+        try { renderHome(); } catch (e) { showErrorBar('首頁重新顯示失敗：' + (e && e.message ? e.message : String(e))); }
+    }
+}
+
+window.addEventListener('error', e => {
+    showErrorBar('程式出錯：' + (e && e.message ? e.message : '未知錯誤'));
+});
+window.addEventListener('unhandledrejection', e => {
+    const r = e && e.reason;
+    showErrorBar('程式出錯：' + (r && r.message ? r.message : String(r)));
+});
+
+// ================================================================
 //  INIT
 // ================================================================
 (function init() {
@@ -2073,12 +2115,17 @@ function toast(msg) { const t = document.getElementById('toast'); t.textContent 
     checkBackupReminder();
 
     // Render home
-    renderHome();
+    try { renderHome(); } catch (e) {
+        console.error(e);
+        showErrorBar('首頁顯示出錯：' + (e && e.message ? e.message : String(e)));
+    }
+    homeWatchdog();
 
     // Auto refresh home every 30 seconds for countdowns + check reminders every 5 min
     setInterval(() => {
         if (currentPage === 'home') {
             renderHome();
+            homeWatchdog();
             checkAndSendReminders();
         }
         if (currentPage === 'reminders') {
@@ -2093,16 +2140,16 @@ function toast(msg) { const t = document.getElementById('toast'); t.textContent 
     }, 5 * 60 * 1000);
 
     // 處理 BFCache 恢復（手機瀏覽器後退/前進緩存）
-    window.addEventListener('pageshow', e => {
-        if (e.persisted) {
-            if (currentPage === 'home') renderHome();
-        }
+    window.addEventListener('pageshow', () => {
+        if (currentPage === 'home') { renderHome(); homeWatchdog(); }
     });
+    window.addEventListener('focus', homeWatchdog);
 
     // 處理 PWA 從後台切回前台（iOS Safari / Android Chrome）
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden && currentPage === 'home') {
             renderHome();
+            homeWatchdog();
         }
     });
 })();
