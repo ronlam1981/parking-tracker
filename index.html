@@ -540,17 +540,16 @@ function showPage(id) {
         b.classList.toggle('act', (i === 0 && id === 'home') || (i === 1 && id === 'history') || (i === 2 && id === 'reminders') || (i === 3 && id === 'settings'));
     });
     if (id === 'home') {
-        checkAndSendReminders();
-        saveRecords(); // 保存提醒狀態
-        renderHome();
+        // 先畫首頁；提醒檢查就算出事都唔會再令首頁空白
+        safe('renderHome', renderHome);
+        safe('checkAndSendReminders', checkAndSendReminders);
         document.getElementById('hdrTitle').textContent = '泊車記錄';
     }
     if (id !== 'history' && batchMode) { batchMode = false; selectedRecordIds.clear(); }
     if (id === 'history') { renderHistory(); document.getElementById('hdrTitle').textContent = '泊車歷史'; }
     if (id === 'reminders') {
-        checkAndSendReminders();
-        saveRecords();
-        renderReminders();
+        safe('checkAndSendReminders', checkAndSendReminders);
+        safe('renderReminders', renderReminders);
         document.getElementById('hdrTitle').textContent = '提醒事項';
     }
     if (id === 'vehicles') { renderVehicles(); document.getElementById('hdrTitle').textContent = '管理車輛'; }
@@ -1314,12 +1313,16 @@ function checkAndSendReminders() {
         const v = vehicles.find(x => x.id === r.vehicleId);
         const vName = v ? v.name : '你架車';
 
-        if (r.parkType === 'meter' && r.meterEndTime) {
-            checkMeterReminder(r, vName, now);
-        } else if (r.parkType === 'free') {
-            checkFreeReminder(r, vName, now);
-        } else if (r.parkType === 'lot') {
-            checkLotReminder(r, vName, now);
+        try {
+            if (r.parkType === 'meter' && r.meterEndTime) {
+                checkMeterReminder(r, vName, now);
+            } else if (r.parkType === 'free') {
+                checkFreeReminder(r, vName, now);
+            } else if (r.parkType === 'lot') {
+                checkLotReminder(r, vName, now);
+            }
+        } catch (e) {
+            console.error('提醒檢查出錯', e);
         }
     });
 
@@ -1395,8 +1398,21 @@ function checkLotReminder(record, vName, now) {
 }
 
 function sendNotification(title, body) {
-    if ('Notification' in window && Notification.permission === 'granted') {
+    // 重要：iPhone（iOS）唔支援 new Notification()，會直接拋錯。
+    // 以前呢度一拋錯就會連首頁都畫唔出，所以一定要包 try/catch，
+    // 並且優先行 Service Worker 嘅 showNotification（iOS 唯一支援嘅做法）。
+    try {
+        if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+        if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+            navigator.serviceWorker.ready
+                .then(reg => reg.showNotification(title, { body, tag: 'pk-' + Date.now(), icon: 'icon-192.png' }))
+                .catch(() => { try { new Notification(title, { body }); } catch (e) { console.warn('通知失敗', e); } });
+            return;
+        }
         new Notification(title, { body, tag: 'pk-' + Date.now() });
+    } catch (e) {
+        console.warn('通知發送失敗（唔影響其他功能）', e);
     }
 }
 
@@ -2048,6 +2064,12 @@ function toast(msg) { const t = document.getElementById('toast'); t.textContent 
 // ================================================================
 //  白畫面守護（出錯唔會靜靜咁空白，同埋會自動補救）
 // ================================================================
+// 包住一個步驟，出事只記低，唔會拖冧後面嘅步驟（例如 renderHome）
+function safe(label, fn) {
+    try { return fn(); }
+    catch (e) { console.error(label + ' 出錯', e); return undefined; }
+}
+
 function showErrorBar(msg) {
     let bar = document.getElementById('errBar');
     if (!bar) {
@@ -2101,42 +2123,42 @@ window.addEventListener('unhandledrejection', e => {
     }
 
     // Request notification permission
-    if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission();
-    }
+    try {
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+    } catch (e) { console.warn('通知權限請求失敗', e); }
 
-    // Auto-delete old records
-    cleanupOldRecords();
-
-    // Check and send reminders (檢查式提醒，而非依賴 setTimeout)
-    checkAndSendReminders();
-
-    // Check backup reminder
-    checkBackupReminder();
-
-    // Render home
+    // 先畫首頁：確保無論後面任何一步出事，首頁都一定有嘢顯示
     try { renderHome(); } catch (e) {
         console.error(e);
         showErrorBar('首頁顯示出錯：' + (e && e.message ? e.message : String(e)));
     }
+
+    safe('cleanupOldRecords', cleanupOldRecords);
+    safe('checkAndSendReminders', checkAndSendReminders);
+    safe('checkBackupReminder', checkBackupReminder);
+
+    // 提醒／清理之後可能改咗記錄，再畫一次
+    safe('renderHome', renderHome);
     homeWatchdog();
 
     // Auto refresh home every 30 seconds for countdowns + check reminders every 5 min
     setInterval(() => {
         if (currentPage === 'home') {
-            renderHome();
+            safe('renderHome', renderHome);
             homeWatchdog();
-            checkAndSendReminders();
+            safe('checkAndSendReminders', checkAndSendReminders);
         }
         if (currentPage === 'reminders') {
-            renderReminders();
-            checkAndSendReminders();
+            safe('renderReminders', renderReminders);
+            safe('checkAndSendReminders', checkAndSendReminders);
         }
     }, 30000);
 
     // 每 5 分鐘檢查一次提醒（即使在其他頁面）
     setInterval(() => {
-        checkAndSendReminders();
+        safe('checkAndSendReminders', checkAndSendReminders);
     }, 5 * 60 * 1000);
 
     // 處理 BFCache 恢復（手機瀏覽器後退/前進緩存）
