@@ -1,0 +1,14 @@
+# 用指令部署嘅設定檔。喺呢個 worker/ 資料夾入面執行：
+#
+#     npx wrangler login                    # 第一次先做
+#     npx wrangler secret put ANTHROPIC_API_KEY   # 貼你個 API key（唔會寫入檔案）
+#     npx wrangler deploy
+#
+# 唔想用指令？照跟 README.md 喺 Cloudflare 網頁度設定一樣得。
+
+name = "parking-receipt-ai"
+main = "receipt-worker.js"
+compatibility_date = "2026-09-26"
+workers_dev = true
+
+# ANTHROPIC_API_KEY 一定要用 Secret，唔好寫喺呢度 —— 呢個檔案會入 git。

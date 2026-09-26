@@ -236,6 +236,35 @@
         .now-card .exit-box .exit-time,.now-card .exit-box .exit-label{color:#fff}
         .v-status .v-parking-elapsed{font-size:12px;color:var(--pri);font-weight:600;margin-top:2px}
 
+        /* ===== 車輛詳情 ===== */
+        .vd-tabs{display:flex;gap:6px;margin-bottom:12px}
+        .vd-tab{flex:1;padding:10px 4px;border:1px solid var(--border);background:var(--card);border-radius:8px;font-size:13px;font-weight:600;color:var(--txt2);cursor:pointer}
+        .vd-tab.act{background:var(--pri);color:#fff;border-color:var(--pri)}
+        .vd-head{background:var(--card);border-radius:var(--r);padding:14px;margin-bottom:12px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+        .vd-head img,.vd-head .ph{width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:26px}
+        .vd-head .n{font-size:17px;font-weight:700}
+        .vd-head .t{font-size:12px;color:var(--txt2);margin-top:2px}
+        .item{background:var(--card);border-radius:var(--r);padding:12px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+        .item .i-head{display:flex;align-items:flex-start;gap:10px}
+        .item .i-thumb{width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0;border:1px solid var(--border);background:#f1f5f9}
+        .item .i-main{flex:1;min-width:0}
+        .item .i-title{font-size:14px;font-weight:700}
+        .item .i-sub{font-size:12px;color:var(--txt2);margin-top:2px;line-height:1.5}
+        .item .i-right{text-align:right;flex-shrink:0}
+        .item .i-amt{font-size:15px;font-weight:800;color:var(--pri);font-variant-numeric:tabular-nums}
+        .item .i-acts{display:flex;gap:6px;margin-top:8px}
+        .item .i-acts button{flex:1;padding:6px;border:1px solid var(--border);background:#fff;border-radius:6px;font-size:12px;cursor:pointer}
+        .tagx{display:inline-block;font-size:11px;font-weight:600;border-radius:4px;padding:1px 6px;background:#eff6ff;color:var(--pri)}
+        .tagx.warn{background:#fffbeb;color:#b45309}
+        .tagx.danger{background:#fef2f2;color:var(--danger)}
+        .tagx.ok{background:#f0fdf4;color:#16a34a}
+        .fg-row{display:flex;gap:8px}
+        .fg-row .fg{flex:1}
+        .fuel-sum{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+        .fuel-sum .c{background:var(--card);border-radius:10px;padding:10px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+        .fuel-sum .c .n{font-size:17px;font-weight:800;color:var(--pri);font-variant-numeric:tabular-nums}
+        .fuel-sum .c .l{font-size:11px;color:var(--txt2);margin-top:2px}
+
         /* ===== 月結統計 ===== */
         .mstat{background:var(--card);border-radius:var(--r);padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
         .mstat .m-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
@@ -397,6 +426,18 @@
     <button class="btn btn-out" style="margin-top:12px" onclick="showAddVehicle()">＋ 新增車輛</button>
 </div>
 
+<!-- ==================== VEHICLE DETAIL ==================== -->
+<div id="pg-vehicle" class="page">
+    <div class="flow-title"><button class="flow-back" onclick="showPage('vehicles')">←</button><span id="vdName">車輛資料</span></div>
+    <div id="vdHeader"></div>
+    <div class="vd-tabs">
+        <button class="vd-tab act" data-tab="docs" onclick="setVehTab('docs')">📄 文件</button>
+        <button class="vd-tab" data-tab="fuel" onclick="setVehTab('fuel')">⛽ 入油</button>
+        <button class="vd-tab" data-tab="maint" onclick="setVehTab('maint')">🔧 保養</button>
+    </div>
+    <div id="vdBody"></div>
+</div>
+
 <!-- ==================== HISTORY ==================== -->
 <div id="pg-history" class="page">
     <div class="hist-top">
@@ -446,6 +487,34 @@
         </div>
         <div style="margin-top:10px">
             <button class="btn btn-out" style="width:100%;font-size:14px" onclick="exportCsv()">📊 匯出 CSV（Excel 可開，報銷用）</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="fg">
+            <label>☁️ Google Drive 備份</label>
+            <p id="gdriveStatus" style="font-size:12px;margin:4px 0 10px"></p>
+            <button class="btn btn-pri" id="gdriveBackupBtn" style="width:100%;font-size:14px;margin-bottom:8px" onclick="driveBackupNow()">☁️ 立即備份到 Google Drive</button>
+            <button class="btn btn-out" style="width:100%;font-size:14px;margin-bottom:10px" onclick="driveRestore()">⬇️ 由 Google Drive 還原</button>
+            <label>Google Client ID</label>
+            <input type="text" id="gdriveIdInput" placeholder="xxxxx.apps.googleusercontent.com" onchange="saveDriveClientId()">
+            <p style="font-size:11px;color:var(--txt2);margin-top:6px;line-height:1.6">
+                喺 Google Cloud Console 開一個免費 OAuth 用戶端（步驟見 repo 內 <b>docs/google-drive.md</b>）。<br>
+                權限只係 <b>drive.file</b>：只掂到呢個 App 自己建立嘅檔案，睇唔到你 Drive 其他嘢。<br>
+                備份會存入「泊車記錄備份」資料夾，包埋所有文件同單據相片。
+            </p>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="fg">
+            <label>AI 讀入油單 — 中轉網址（Cloudflare Worker）</label>
+            <input type="text" id="aiProxyInput" placeholder="https://xxx.workers.dev" onchange="saveAiProxy()">
+            <p style="font-size:11px;color:var(--txt2);margin-top:6px;line-height:1.6">
+                影低入油單，AI 會自動填返入油量、單價、金額同日期。<br>
+                你嘅 API key 只會存喺 Worker（Secret），唔會出現喺呢個網頁。<br>
+                留空就淨係影相存底，數要自己填。
+            </p>
         </div>
         <div class="fg" style="margin-bottom:8px">
             <label>自動備份提醒</label>
@@ -512,6 +581,20 @@
 </div>
 
 <!-- ===== Modal: Photo View ===== -->
+<input type="file" id="docImgCam" accept="image/*" capture="environment">
+<input type="file" id="docImgFile" accept="image/*">
+
+<div class="modal-bg" id="formModal">
+    <div class="modal" style="max-height:88vh;overflow-y:auto">
+        <h2 id="formTitle">新增</h2>
+        <div id="formBody"></div>
+        <div class="modal-acts">
+            <button class="btn btn-out" onclick="closeFormModal()">取消</button>
+            <button class="btn btn-pri" id="formSaveBtn">儲存</button>
+        </div>
+    </div>
+</div>
+
 <div class="modal-bg" id="photoModal" onclick="this.classList.remove('show')">
     <div class="modal" style="padding:8px;max-width:95vw" onclick="event.stopPropagation()">
         <img id="photoModalImg" src="" style="width:100%;border-radius:12px">
@@ -599,6 +682,7 @@ function showPage(id) {
         document.getElementById('hdrTitle').textContent = '提醒事項';
     }
     if (id === 'vehicles') { renderVehicles(); document.getElementById('hdrTitle').textContent = '管理車輛'; }
+    if (id === 'vehicle') { safe('renderVehicleDetail', renderVehicleDetail); }
     if (id === 'park') { document.getElementById('hdrTitle').textContent = '泊車'; }
     else { stopLocWatch(); }
     if (id === 'settings') { renderSettings(); document.getElementById('hdrTitle').textContent = '設定'; }
@@ -2023,6 +2107,7 @@ function renderVehicles() {
                     <div class="vm-type">${v.type === 'car' ? '私家車' : '電單車'}</div>
                     ${v.plate ? `<div class="vm-plate">${esc(v.plate)}</div>` : ''}
                 </div>
+                <button class="vm-edit" onclick="openVehicle('${v.id}')">📋 資料</button>
                 <button class="vm-edit" onclick="editVehicle('${v.id}')">編輯</button>
                 <button class="vm-edit" style="color:var(--danger);border-color:#fecaca;margin-left:4px" onclick="deleteVehicle('${v.id}')">刪除</button>
             </div>`;
@@ -2482,9 +2567,13 @@ function renderReminders() {
     const container = document.getElementById('remList');
     const now = new Date();
 
+    const expiryHtml = safe('renderExpiryAlerts', renderExpiryAlerts) || '';
+
     const activeRecords = records.filter(r => r.active);
     if (activeRecords.length === 0) {
-        container.innerHTML = '<div class="empty"><div class="ico">🔔</div><p>暫時冇提醒</p></div>';
+        container.innerHTML = expiryHtml + (expiryHtml
+            ? ''
+            : '<div class="empty"><div class="ico">🔔</div><p>暫時冇提醒</p></div>');
         return;
     }
 
@@ -2610,7 +2699,17 @@ function getAutoDeleteDays() {
     return parseInt(localStorage.getItem('pk_auto_delete') || '0');
 }
 
+function saveAiProxy() {
+    setAiProxy(document.getElementById('aiProxyInput').value);
+    toast('已儲存 AI 中轉網址');
+}
+
 function renderSettings() {
+    const ai = document.getElementById('aiProxyInput');
+    if (ai) ai.value = getAiProxy();
+    const gd = document.getElementById('gdriveIdInput');
+    if (gd) gd.value = DRIVE.clientId();
+    safe('renderDriveStatus', renderDriveStatus);
     document.getElementById('autoDeleteSetting').value = getAutoDeleteDays().toString();
     document.getElementById('autoBackupSetting').value = getAutoBackupDays().toString();
     renderBackupInfo();
@@ -2643,27 +2742,31 @@ function cleanupOldRecords() {
 // ================================================================
 //  DATA BACKUP / EXPORT / IMPORT
 // ================================================================
-function exportData() {
-    const data = {
-        _app: '泊車記錄',
-        _version: 1,
-        _exportedAt: new Date().toISOString(),
-        pk_vehicles: getVehicles(),
-        pk_records: getRecords(),
-        pk_own_locations: getOwnLocations(),
-        pk_auto_delete: localStorage.getItem('pk_auto_delete') || '0',
-        pk_auto_backup: localStorage.getItem('pk_auto_backup') || '0'
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+async function exportData() {
+    const data = await buildBackupPayload();
+    const d = new Date();
+    const name = `parking-backup-${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}.json`;
+    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+
+    // iPhone：行分享面板，可以直接存去 Google Drive／檔案／電郵出去
+    try {
+        const file = new File([blob], name, { type: 'application/json' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: '泊車記錄備份' }).catch(() => {});
+            localStorage.setItem('pk_last_backup', Date.now().toString());
+            renderBackupInfo();
+            toast('已匯出：' + backupSummary(data));
+            return;
+        }
+    } catch (e) { /* 唔支援就照用下面 */ }
+
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    const d = new Date();
-    a.href = url;
-    a.download = `泊車記錄_備份_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    a.href = url; a.download = name; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
     localStorage.setItem('pk_last_backup', Date.now().toString());
-    toast('資料已匯出');
+    toast('已匯出：' + backupSummary(data));
     renderBackupInfo();
 }
 
@@ -2680,20 +2783,15 @@ function importData(event) {
             }
             const existV = getVehicles().length;
             const existR = getRecords().length;
-            const importV = (data.pk_vehicles || []).length;
-            const importR = (data.pk_records || []).length;
-            const msg = `將匯入 ${importV} 架車輛、${importR} 條泊車紀錄。\n\n` +
+            const msg = `將匯入：${backupSummary(data)}。\n\n` +
                         (existV || existR ? `⚠️ 現有資料（${existV} 架車輛、${existR} 條紀錄）將被覆蓋。\n\n` : '') +
                         '確定匯入？';
             if (!confirm(msg)) return;
-            if (data.pk_vehicles) setVehicles(data.pk_vehicles);
-            if (data.pk_records) setRecords(data.pk_records);
-            if (data.pk_own_locations) setOwnLocations(data.pk_own_locations);
-            if (data.pk_auto_delete) localStorage.setItem('pk_auto_delete', data.pk_auto_delete);
-            if (data.pk_auto_backup) localStorage.setItem('pk_auto_backup', data.pk_auto_backup);
-            toast('資料匯入成功！');
-            renderSettings();
-            renderHome();
+            restoreBackupPayload(data).then(() => {
+                toast('資料匯入成功！');
+                renderSettings();
+                renderHome();
+            });
         } catch (err) {
             toast('匯入失敗：檔案格式錯誤');
         }
@@ -2731,10 +2829,1080 @@ function checkBackupReminder() {
     const now = Date.now();
     if (last === 0 || (now - last) > days * 24 * 60 * 60000) {
         setTimeout(() => {
-            if (confirm('距離上次備份已超過 ' + days + ' 天，建議立即備份資料。\n\n立即匯出備份？')) {
-                exportData();
-            }
+            const hasDrive = !!DRIVE.clientId();
+            const msg = '距離上次備份已超過 ' + days + ' 天，建議立即備份。\n\n'
+                + (hasDrive ? '立即備份到 Google Drive？' : '立即匯出備份檔？');
+            if (confirm(msg)) { hasDrive ? driveBackupNow() : exportData(); }
         }, 2000);
+    }
+}
+
+// ================================================================
+//  IndexedDB 圖片庫
+//  localStorage 得 5MB，放唔落登記摺／保險／入油單。IndexedDB 有幾百 MB
+//  到幾 GB，同樣係存喺你部機、同樣離線用得。
+// ================================================================
+const IMGDB = {
+    _db: null,
+    open() {
+        if (IMGDB._db) return Promise.resolve(IMGDB._db);
+        return new Promise((resolve, reject) => {
+            if (!window.indexedDB) { reject(new Error('裝置唔支援 IndexedDB')); return; }
+            const req = indexedDB.open('parking_tracker', 1);
+            req.onupgradeneeded = e => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains('images')) db.createObjectStore('images', { keyPath: 'id' });
+            };
+            req.onsuccess = () => { IMGDB._db = req.result; resolve(IMGDB._db); };
+            req.onerror = () => reject(req.error);
+        });
+    },
+    _tx(mode) {
+        return IMGDB.open().then(db => db.transaction('images', mode).objectStore('images'));
+    },
+    put(id, dataUrl) {
+        return IMGDB._tx('readwrite').then(store => new Promise((resolve, reject) => {
+            const r = store.put({ id, data: dataUrl, at: Date.now() });
+            r.onsuccess = () => resolve(id);
+            r.onerror = () => reject(r.error);
+        }));
+    },
+    get(id) {
+        if (!id) return Promise.resolve(null);
+        return IMGDB._tx('readonly').then(store => new Promise(resolve => {
+            const r = store.get(id);
+            r.onsuccess = () => resolve(r.result ? r.result.data : null);
+            r.onerror = () => resolve(null);
+        })).catch(() => null);
+    },
+    del(id) {
+        if (!id) return Promise.resolve();
+        return IMGDB._tx('readwrite').then(store => new Promise(resolve => {
+            const r = store.delete(id);
+            r.onsuccess = r.onerror = () => resolve();
+        })).catch(() => {});
+    },
+    all() {   // 匯出備份用
+        return IMGDB._tx('readonly').then(store => new Promise(resolve => {
+            const r = store.getAll();
+            r.onsuccess = () => resolve(r.result || []);
+            r.onerror = () => resolve([]);
+        })).catch(() => []);
+    }
+};
+
+function newImgId() { return 'img_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+function saveImage(dataUrl) {
+    const id = newImgId();
+    return IMGDB.put(id, dataUrl).then(() => id).catch(e => { console.error('存相失敗', e); return null; });
+}
+
+// 畫面上用 <img data-img-id="..."> 佔位，之後由 IndexedDB 填返 src
+function hydrateImages(root) {
+    (root || document).querySelectorAll('img[data-img-id]').forEach(el => {
+        const id = el.dataset.imgId;
+        if (!id || el.dataset.hydrated) return;
+        el.dataset.hydrated = '1';
+        IMGDB.get(id).then(d => { if (d) el.src = d; });
+    });
+}
+
+// ================================================================
+//  入油／保養／文件 資料層
+// ================================================================
+function getFuel() { return STORE.get('pk_fuel', []) }
+function setFuel(v) { return STORE.set('pk_fuel', v) }
+function getMaint() { return STORE.get('pk_maint', []) }
+function setMaint(v) { return STORE.set('pk_maint', v) }
+function getDocs() { return STORE.get('pk_docs', []) }
+function setDocs(v) { return STORE.set('pk_docs', v) }
+
+const DOC_KINDS = ['行車證／登記摺', '保險', '驗車紙', '牌費單', '其他'];
+const MAINT_TYPES = ['換機油', '換輪胎', '剎車', '電池', '定期保養', '維修', '驗車', '其他'];
+
+function newId(prefix) { return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function num(v) { const n = parseFloat(v); return isFinite(n) ? n : null; }
+function fmtDate(d) { const x = new Date(d); return `${x.getFullYear()}/${pad(x.getMonth() + 1)}/${pad(x.getDate())}`; }
+function toDateInput(d) { const x = new Date(d); return `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`; }
+function daysUntil(dateStr) {
+    if (!dateStr) return null;
+    const t = new Date(dateStr + 'T00:00:00').getTime();
+    if (isNaN(t)) return null;
+    return Math.ceil((t - Date.now()) / 86400000);
+}
+
+// ================================================================
+//  油耗計算
+//  用「兩次入油之間嘅里程差 ÷ 今次入油量」。行內做法係只計「加滿」
+//  嗰啲，因為加滿先知道上一段路實際用咗幾多油。
+// ================================================================
+function fuelStats(vehicleId) {
+    const list = getFuel().filter(f => f.vehicleId === vehicleId)
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    const out = { count: list.length, totalCost: 0, totalLiters: 0, lastKmL: null, avgKmL: null, lastOdo: null, perKm: null };
+    if (!list.length) return out;
+
+    list.forEach(f => {
+        if (typeof f.total === 'number') out.totalCost += f.total;
+        if (typeof f.liters === 'number') out.totalLiters += f.liters;
+        if (typeof f.odo === 'number') out.lastOdo = Math.max(out.lastOdo || 0, f.odo);
+    });
+
+    let sumKm = 0, sumL = 0;
+    for (let i = 0; i < list.length; i++) {
+        const f = list[i];
+        if (!f.full || typeof f.liters !== 'number' || f.liters <= 0) continue;
+
+        // 距離：優先用今程里程，冇就用同上一次嘅里程錶差
+        let km = null;
+        if (typeof f.trip === 'number' && f.trip > 0) km = f.trip;
+        else {
+            const prev = list.slice(0, i).reverse().find(x => typeof x.odo === 'number');
+            if (prev && typeof f.odo === 'number' && f.odo > prev.odo) km = f.odo - prev.odo;
+        }
+        if (!km) continue;
+
+        f._kmL = km / f.liters;
+        sumKm += km; sumL += f.liters;
+        out.lastKmL = f._kmL;
+    }
+    if (sumL > 0) {
+        out.avgKmL = sumKm / sumL;
+        if (out.totalLiters > 0 && out.totalCost > 0) out.perKm = (out.totalCost / out.totalLiters) / out.avgKmL;
+    }
+    return out;
+}
+
+function kmLtoL100(kmL) { return kmL > 0 ? 100 / kmL : null; }
+
+// ================================================================
+//  車輛詳情頁
+// ================================================================
+let curVehId = null;
+let vehTab = 'docs';
+
+function openVehicle(id) {
+    curVehId = id;
+    vehTab = 'docs';
+    showPage('vehicle');
+}
+
+function setVehTab(t) {
+    vehTab = t;
+    document.querySelectorAll('.vd-tab').forEach(b => b.classList.toggle('act', b.dataset.tab === t));
+    renderVehBody();
+}
+
+function renderVehicleDetail() {
+    const v = getVehicles().find(x => x.id === curVehId);
+    if (!v) { showPage('vehicles'); return; }
+
+    document.getElementById('vdName').textContent = v.name;
+    document.getElementById('hdrTitle').textContent = '車輛資料';
+
+    const st = fuelStats(v.id);
+    document.getElementById('vdHeader').innerHTML = `
+        <div class="vd-head">
+            ${v.photo ? `<img src="${v.photo}" alt="">` : `<div class="ph">${v.type === 'car' ? '🚗' : '🏍️'}</div>`}
+            <div style="flex:1;min-width:0">
+                <div class="n">${esc(v.name)}</div>
+                <div class="t">${v.type === 'car' ? '私家車' : '電單車'}${v.plate ? ' · ' + esc(v.plate) : ''}</div>
+                ${st.lastOdo ? `<div class="t">里程錶：${st.lastOdo.toLocaleString()} km</div>` : ''}
+            </div>
+        </div>`;
+
+    document.querySelectorAll('.vd-tab').forEach(b => b.classList.toggle('act', b.dataset.tab === vehTab));
+    renderVehBody();
+}
+
+function renderVehBody() {
+    if (vehTab === 'docs') renderDocs();
+    else if (vehTab === 'fuel') renderFuel();
+    else renderMaint();
+}
+
+// ---------- 文件 ----------
+function renderDocs() {
+    const box = document.getElementById('vdBody');
+    const list = getDocs().filter(d => d.vehicleId === curVehId)
+        .sort((a, b) => (a.expiry || '9999').localeCompare(b.expiry || '9999'));
+
+    const add = `<button class="btn btn-out" style="margin-bottom:12px" onclick="editDoc()">＋ 新增文件（影相或上載）</button>`;
+
+    if (!list.length) {
+        box.innerHTML = add + '<div class="empty"><div class="ico">📄</div><p>未有文件<br><span style="font-size:12px">影低行車證、保險單、驗車紙，隨時查得到</span></p></div>';
+        return;
+    }
+
+    box.innerHTML = add + list.map(d => {
+        const dd = daysUntil(d.expiry);
+        let tag = '';
+        if (dd !== null) {
+            if (dd < 0) tag = `<span class="tagx danger">已過期 ${-dd} 日</span>`;
+            else if (dd <= 30) tag = `<span class="tagx warn">仲有 ${dd} 日到期</span>`;
+            else tag = `<span class="tagx ok">${fmtDate(d.expiry + 'T00:00:00')} 到期</span>`;
+        }
+        const imgs = (d.imgIds || []);
+        return `
+            <div class="item">
+                <div class="i-head">
+                    ${imgs.length ? `<img class="i-thumb" data-img-id="${imgs[0]}" onclick="viewStoredImage('${imgs[0]}')">` : '<div class="i-thumb" style="display:flex;align-items:center;justify-content:center;font-size:20px">📄</div>'}
+                    <div class="i-main">
+                        <div class="i-title">${esc(d.title || d.kind)}</div>
+                        <div class="i-sub">${esc(d.kind)}${imgs.length > 1 ? ` · ${imgs.length} 張` : ''}</div>
+                        <div class="i-sub">${tag}</div>
+                        ${d.note ? `<div class="i-sub">📝 ${esc(d.note)}</div>` : ''}
+                    </div>
+                </div>
+                <div class="i-acts">
+                    ${imgs.length ? `<button onclick="viewStoredImage('${imgs[0]}')">🔍 睇文件</button>` : ''}
+                    <button onclick="editDoc('${d.id}')">編輯</button>
+                    <button style="color:var(--danger)" onclick="deleteDoc('${d.id}')">刪除</button>
+                </div>
+            </div>`;
+    }).join('');
+
+    hydrateImages(box);
+}
+
+function viewStoredImage(id) {
+    IMGDB.get(id).then(d => { if (d) viewPhoto(d); else toast('搵唔到呢張相'); });
+}
+
+// ---------- 入油 ----------
+function renderFuel() {
+    const box = document.getElementById('vdBody');
+    const list = getFuel().filter(f => f.vehicleId === curVehId)
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
+    const st = fuelStats(curVehId);
+
+    const sum = `
+        <div class="fuel-sum">
+            <div class="c"><div class="n">${st.avgKmL ? st.avgKmL.toFixed(1) : '—'}</div><div class="l">平均 km/L${st.avgKmL ? `（${kmLtoL100(st.avgKmL).toFixed(1)} L/100km）` : ''}</div></div>
+            <div class="c"><div class="n">${st.lastKmL ? st.lastKmL.toFixed(1) : '—'}</div><div class="l">最近一次 km/L</div></div>
+            <div class="c"><div class="n">$${Math.round(st.totalCost)}</div><div class="l">累計油錢（${st.count} 次）</div></div>
+            <div class="c"><div class="n">${st.perKm ? '$' + st.perKm.toFixed(2) : '—'}</div><div class="l">每公里油錢</div></div>
+        </div>`;
+
+    const add = `<button class="btn btn-pri" style="margin-bottom:12px" onclick="editFuel()">＋ 新增入油（影單自動填）</button>`;
+
+    if (!list.length) {
+        box.innerHTML = sum + add + '<div class="empty"><div class="ico">⛽</div><p>未有入油記錄<br><span style="font-size:12px">影低入油單，AI 會幫你填數</span></p></div>';
+        return;
+    }
+
+    box.innerHTML = sum + add + list.map(f => {
+        const kmL = typeof f._kmL === 'number' ? f._kmL : null;
+        return `
+            <div class="item">
+                <div class="i-head">
+                    ${f.receiptImgId ? `<img class="i-thumb" data-img-id="${f.receiptImgId}" onclick="viewStoredImage('${f.receiptImgId}')">` : '<div class="i-thumb" style="display:flex;align-items:center;justify-content:center;font-size:20px">⛽</div>'}
+                    <div class="i-main">
+                        <div class="i-title">${fmtDate(f.date)}${f.full ? '' : ' <span class="tagx warn">冇加滿</span>'}${f.source === 'ai' ? ' <span class="tagx">AI 填</span>' : ''}</div>
+                        <div class="i-sub">${typeof f.liters === 'number' ? f.liters.toFixed(2) + ' L' : '—'}${typeof f.pricePerL === 'number' ? ` @ $${f.pricePerL.toFixed(2)}/L` : ''}${f.station ? ' · ' + esc(f.station) : ''}</div>
+                        <div class="i-sub">${typeof f.odo === 'number' ? `里程 ${f.odo.toLocaleString()} km` : ''}${typeof f.trip === 'number' ? ` · 今程 ${f.trip} km` : ''}${kmL ? ` · <b>${kmL.toFixed(1)} km/L</b>` : ''}</div>
+                        ${f.note ? `<div class="i-sub">📝 ${esc(f.note)}</div>` : ''}
+                    </div>
+                    <div class="i-right"><div class="i-amt">$${typeof f.total === 'number' ? (f.total % 1 ? f.total.toFixed(1) : f.total) : '—'}</div></div>
+                </div>
+                <div class="i-acts">
+                    <button onclick="editFuel('${f.id}')">編輯</button>
+                    <button style="color:var(--danger)" onclick="deleteFuel('${f.id}')">刪除</button>
+                </div>
+            </div>`;
+    }).join('');
+
+    hydrateImages(box);
+}
+
+// ---------- 保養 ----------
+function renderMaint() {
+    const box = document.getElementById('vdBody');
+    const list = getMaint().filter(m => m.vehicleId === curVehId)
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
+    const st = fuelStats(curVehId);
+
+    const add = `<button class="btn btn-out" style="margin-bottom:12px" onclick="editMaint()">＋ 新增保養／維修記錄</button>`;
+
+    if (!list.length) {
+        box.innerHTML = add + '<div class="empty"><div class="ico">🔧</div><p>未有保養記錄</p></div>';
+        return;
+    }
+
+    const total = list.reduce((s, m) => s + (typeof m.cost === 'number' ? m.cost : 0), 0);
+
+    box.innerHTML = add + `<p class="section-title">累計 ${list.length} 次，共 $${Math.round(total)}</p>` + list.map(m => {
+        const dd = daysUntil(m.nextDate);
+        let due = '';
+        if (dd !== null) {
+            due = dd < 0 ? `<span class="tagx danger">下次保養已過期 ${-dd} 日</span>`
+                : dd <= 30 ? `<span class="tagx warn">仲有 ${dd} 日就要做</span>`
+                : `<span class="tagx ok">下次 ${fmtDate(m.nextDate + 'T00:00:00')}</span>`;
+        }
+        if (typeof m.nextOdo === 'number' && st.lastOdo) {
+            const left = m.nextOdo - st.lastOdo;
+            due += ` <span class="tagx ${left <= 0 ? 'danger' : left <= 1000 ? 'warn' : 'ok'}">${left <= 0 ? `已超 ${-left} km` : `仲有 ${left.toLocaleString()} km`}</span>`;
+        }
+        return `
+            <div class="item">
+                <div class="i-head">
+                    ${m.imgId ? `<img class="i-thumb" data-img-id="${m.imgId}" onclick="viewStoredImage('${m.imgId}')">` : '<div class="i-thumb" style="display:flex;align-items:center;justify-content:center;font-size:20px">🔧</div>'}
+                    <div class="i-main">
+                        <div class="i-title">${esc(m.type)}</div>
+                        <div class="i-sub">${fmtDate(m.date)}${typeof m.odo === 'number' ? ` · ${m.odo.toLocaleString()} km` : ''}${m.shop ? ' · ' + esc(m.shop) : ''}</div>
+                        ${due ? `<div class="i-sub">${due}</div>` : ''}
+                        ${m.note ? `<div class="i-sub">📝 ${esc(m.note)}</div>` : ''}
+                    </div>
+                    <div class="i-right"><div class="i-amt">${typeof m.cost === 'number' ? '$' + Math.round(m.cost) : ''}</div></div>
+                </div>
+                <div class="i-acts">
+                    <button onclick="editMaint('${m.id}')">編輯</button>
+                    <button style="color:var(--danger)" onclick="deleteMaint('${m.id}')">刪除</button>
+                </div>
+            </div>`;
+    }).join('');
+
+    hydrateImages(box);
+}
+
+// ================================================================
+//  表單彈窗
+// ================================================================
+let formImgIds = [];       // 今次表單暫存嘅相片 id
+let formPendingImg = null; // 單張（入油單／保養單）
+
+function openFormModal(title, bodyHtml, onSave) {
+    document.getElementById('formTitle').textContent = title;
+    document.getElementById('formBody').innerHTML = bodyHtml;
+    document.getElementById('formSaveBtn').onclick = onSave;
+    document.getElementById('formModal').classList.add('show');
+    hydrateImages(document.getElementById('formBody'));
+}
+
+function closeFormModal() {
+    document.getElementById('formModal').classList.remove('show');
+    formImgIds = [];
+    formPendingImg = null;
+}
+
+function fval(id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; }
+function fnum(id) { return num(fval(id)); }
+function fchecked(id) { const el = document.getElementById(id); return el ? el.checked : false; }
+
+// 共用：揀相 → 壓縮 → 存入 IndexedDB
+function pickImage(inputId, cb) {
+    const input = document.getElementById(inputId);
+    input.value = '';
+    input.onchange = () => {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async e => {
+            const compressed = await compressPhoto(e.target.result, 1400, 0.75);  // 文件要睇得清字，用大少少
+            if (!compressed) { toast('相片讀取失敗，請換一張'); return; }
+            const id = await saveImage(compressed);
+            if (!id) { toast('儲存相片失敗'); return; }
+            cb(id, compressed, file);
+        };
+        reader.readAsDataURL(file);
+    };
+    input.click();
+}
+
+// ---------- 文件表單 ----------
+function editDoc(id) {
+    const all = getDocs();
+    const d = id ? all.find(x => x.id === id) : null;
+    formImgIds = d ? (d.imgIds || []).slice() : [];
+
+    const body = `
+        <div class="fg">
+            <label>文件類型</label>
+            <select id="docKind">${DOC_KINDS.map(k => `<option ${d && d.kind === k ? 'selected' : ''}>${k}</option>`).join('')}</select>
+        </div>
+        <div class="fg">
+            <label>標題（可選）</label>
+            <input type="text" id="docTitle" placeholder="例如：2026 年保險" value="${d ? esc(d.title || '') : ''}">
+        </div>
+        <div class="fg">
+            <label>到期日（可選，到期前會提醒）</label>
+            <input type="date" id="docExpiry" value="${d && d.expiry ? d.expiry : ''}">
+        </div>
+        <div class="fg">
+            <label>備註（可選）</label>
+            <input type="text" id="docNote" value="${d ? esc(d.note || '') : ''}">
+        </div>
+        <div class="fg">
+            <label>文件相片（可影多張）</label>
+            <div style="display:flex;gap:8px;margin-bottom:8px">
+                <button class="btn btn-out btn-sm" style="flex:1" onclick="addDocImage('camera')">📷 影相</button>
+                <button class="btn btn-out btn-sm" style="flex:1" onclick="addDocImage('file')">📁 上載</button>
+            </div>
+            <div id="docImgList" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+        </div>`;
+
+    openFormModal(id ? '編輯文件' : '新增文件', body, () => {
+        const rec = {
+            id: d ? d.id : newId('doc'),
+            vehicleId: curVehId,
+            kind: fval('docKind'),
+            title: fval('docTitle'),
+            expiry: fval('docExpiry'),
+            note: fval('docNote'),
+            imgIds: formImgIds.slice(),
+            updatedAt: new Date().toISOString()
+        };
+        const list = getDocs().filter(x => x.id !== rec.id);
+        list.push(rec);
+        if (!setDocs(list)) { toast('儲存失敗，空間不足'); return; }
+        closeFormModal();
+        renderDocs();
+        toast('文件已儲存');
+    });
+    renderDocImgList();
+}
+
+function addDocImage(mode) {
+    pickImage(mode === 'camera' ? 'docImgCam' : 'docImgFile', id => {
+        formImgIds.push(id);
+        renderDocImgList();
+        toast('已加入相片');
+    });
+}
+
+function renderDocImgList() {
+    const box = document.getElementById('docImgList');
+    if (!box) return;
+    box.innerHTML = formImgIds.map((id, i) => `
+        <div style="position:relative">
+            <img data-img-id="${id}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" onclick="viewStoredImage('${id}')">
+            <button onclick="removeDocImage(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:var(--danger);color:#fff;font-size:12px;line-height:1;cursor:pointer">×</button>
+        </div>`).join('');
+    hydrateImages(box);
+}
+
+function removeDocImage(i) {
+    const id = formImgIds[i];
+    formImgIds.splice(i, 1);
+    IMGDB.del(id);
+    renderDocImgList();
+}
+
+function deleteDoc(id) {
+    const d = getDocs().find(x => x.id === id);
+    if (!d) return;
+    confirmDelete(`確定要刪除「${d.title || d.kind}」？相片亦會一併刪除。`, () => {
+        (d.imgIds || []).forEach(i => IMGDB.del(i));
+        setDocs(getDocs().filter(x => x.id !== id));
+        renderDocs();
+        toast('已刪除');
+    });
+}
+
+// 共用確認刪除
+function confirmDelete(msg, onYes) {
+    document.getElementById('delModalTitle').textContent = '確認刪除';
+    document.getElementById('delMsg').innerHTML = esc(msg);
+    document.getElementById('delConfBtn').textContent = '刪除';
+    document.getElementById('delConfBtn').className = 'btn btn-dn';
+    document.getElementById('delModal').classList.add('show');
+    document.getElementById('delConfBtn').onclick = () => { closeDelModal(); onYes(); };
+}
+
+// ---------- 入油表單 ----------
+function editFuel(id) {
+    const all = getFuel();
+    const f = id ? all.find(x => x.id === id) : null;
+    formPendingImg = f ? (f.receiptImgId || null) : null;
+
+    const st = fuelStats(curVehId);
+    const now = new Date();
+    const dtVal = f ? new Date(f.date) : now;
+    const dtStr = `${dtVal.getFullYear()}-${pad(dtVal.getMonth() + 1)}-${pad(dtVal.getDate())}T${pad(dtVal.getHours())}:${pad(dtVal.getMinutes())}`;
+
+    const body = `
+        <div id="fuelAiBox" style="background:#eff6ff;border-radius:10px;padding:12px;margin-bottom:14px">
+            <div style="font-size:13px;font-weight:700;margin-bottom:8px">📷 影入油單，AI 自動填數</div>
+            <div style="display:flex;gap:8px">
+                <button class="btn btn-pri btn-sm" style="flex:1" onclick="scanReceipt('camera')">影單</button>
+                <button class="btn btn-out btn-sm" style="flex:1" onclick="scanReceipt('file')">上載單據相</button>
+            </div>
+            <div id="fuelAiStatus" style="font-size:12px;color:var(--txt2);margin-top:8px"></div>
+            <div id="fuelAiThumb" style="margin-top:8px"></div>
+        </div>
+
+        <div class="fg">
+            <label>日期時間</label>
+            <input type="datetime-local" id="fuelDate" value="${dtStr}">
+        </div>
+        <div class="fg-row">
+            <div class="fg">
+                <label>入油量（公升）</label>
+                <input type="number" id="fuelLiters" inputmode="decimal" step="0.01" placeholder="35.２" value="${f && f.liters != null ? f.liters : ''}" oninput="fuelCalc('liters')">
+            </div>
+            <div class="fg">
+                <label>每公升價錢</label>
+                <input type="number" id="fuelPrice" inputmode="decimal" step="0.01" placeholder="16.5" value="${f && f.pricePerL != null ? f.pricePerL : ''}" oninput="fuelCalc('price')">
+            </div>
+        </div>
+        <div class="fg">
+            <label>總金額</label>
+            <input type="number" id="fuelTotal" inputmode="decimal" step="0.1" placeholder="580" value="${f && f.total != null ? f.total : ''}" oninput="fuelCalc('total')">
+        </div>
+        <div class="fg-row">
+            <div class="fg">
+                <label>里程錶總數（km）</label>
+                <input type="number" id="fuelOdo" inputmode="numeric" placeholder="${st.lastOdo ? '上次 ' + st.lastOdo : '85340'}" value="${f && f.odo != null ? f.odo : ''}">
+            </div>
+            <div class="fg">
+                <label>今程公里（可選）</label>
+                <input type="number" id="fuelTrip" inputmode="numeric" placeholder="420" value="${f && f.trip != null ? f.trip : ''}">
+            </div>
+        </div>
+        <div class="fg">
+            <label style="display:flex;align-items:center;gap:8px;font-size:14px">
+                <input type="checkbox" id="fuelFull" ${!f || f.full ? 'checked' : ''} style="width:auto"> 今次加滿（計油耗要靠呢個）
+            </label>
+        </div>
+        <div class="fg">
+            <label>油站（可選）</label>
+            <input type="text" id="fuelStation" placeholder="例如：蜆殼 黑沙環" value="${f ? esc(f.station || '') : ''}">
+        </div>
+        <div class="fg">
+            <label>備註（可選）</label>
+            <input type="text" id="fuelNote" value="${f ? esc(f.note || '') : ''}">
+        </div>`;
+
+    openFormModal(id ? '編輯入油記錄' : '新增入油記錄', body, () => {
+        const liters = fnum('fuelLiters');
+        const odo = fnum('fuelOdo');
+        if (liters === null && fnum('fuelTotal') === null) { toast('請至少填入油量或總金額'); return; }
+
+        // 里程錶唔應該倒退，行錯數就算唔到油耗
+        if (odo !== null && st.lastOdo && odo < st.lastOdo && (!f || f.odo !== odo)) {
+            if (!confirm(`你填嘅里程 ${odo} km 細過上次記錄嘅 ${st.lastOdo} km。\n\n照樣儲存？`)) return;
+        }
+
+        const rec = {
+            id: f ? f.id : newId('fuel'),
+            vehicleId: curVehId,
+            date: fval('fuelDate') ? new Date(fval('fuelDate')).toISOString() : new Date().toISOString(),
+            liters, pricePerL: fnum('fuelPrice'), total: fnum('fuelTotal'),
+            odo, trip: fnum('fuelTrip'),
+            full: fchecked('fuelFull'),
+            station: fval('fuelStation'),
+            note: fval('fuelNote'),
+            receiptImgId: formPendingImg,
+            source: f ? f.source : (formPendingImg ? 'ai' : 'manual')
+        };
+        const list = getFuel().filter(x => x.id !== rec.id);
+        list.push(rec);
+        if (!setFuel(list)) { toast('儲存失敗，空間不足'); return; }
+        closeFormModal();
+        renderFuel();
+        toast('入油記錄已儲存');
+    });
+}
+
+// 入油量 × 單價 = 總金額：填咗任何兩個，自動計第三個
+function fuelCalc(changed) {
+    const L = fnum('fuelLiters'), P = fnum('fuelPrice'), T = fnum('fuelTotal');
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+    if (changed !== 'total' && L !== null && P !== null) set('fuelTotal', (L * P).toFixed(1));
+    else if (changed === 'total' && T !== null && L !== null && L > 0) set('fuelPrice', (T / L).toFixed(2));
+    else if (changed === 'total' && T !== null && P !== null && P > 0) set('fuelLiters', (T / P).toFixed(2));
+}
+
+function deleteFuel(id) {
+    const f = getFuel().find(x => x.id === id);
+    if (!f) return;
+    confirmDelete('確定要刪除呢次入油記錄？', () => {
+        if (f.receiptImgId) IMGDB.del(f.receiptImgId);
+        setFuel(getFuel().filter(x => x.id !== id));
+        renderFuel();
+        toast('已刪除');
+    });
+}
+
+// ---------- 保養表單 ----------
+function editMaint(id) {
+    const all = getMaint();
+    const m = id ? all.find(x => x.id === id) : null;
+    formPendingImg = m ? (m.imgId || null) : null;
+    const st = fuelStats(curVehId);
+
+    const body = `
+        <div class="fg">
+            <label>類型</label>
+            <select id="maintType">${MAINT_TYPES.map(t => `<option ${m && m.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
+        </div>
+        <div class="fg-row">
+            <div class="fg">
+                <label>日期</label>
+                <input type="date" id="maintDate" value="${m ? toDateInput(m.date) : toDateInput(new Date())}">
+            </div>
+            <div class="fg">
+                <label>里程（km）</label>
+                <input type="number" id="maintOdo" inputmode="numeric" placeholder="${st.lastOdo || ''}" value="${m && m.odo != null ? m.odo : ''}">
+            </div>
+        </div>
+        <div class="fg-row">
+            <div class="fg">
+                <label>費用</label>
+                <input type="number" id="maintCost" inputmode="decimal" step="0.1" value="${m && m.cost != null ? m.cost : ''}">
+            </div>
+            <div class="fg">
+                <label>車行／地點</label>
+                <input type="text" id="maintShop" value="${m ? esc(m.shop || '') : ''}">
+            </div>
+        </div>
+        <div class="fg">
+            <label>備註</label>
+            <input type="text" id="maintNote" value="${m ? esc(m.note || '') : ''}">
+        </div>
+        <p class="section-title" style="margin-top:6px">下次提醒（可選）</p>
+        <div class="fg-row">
+            <div class="fg">
+                <label>下次日期</label>
+                <input type="date" id="maintNextDate" value="${m && m.nextDate ? m.nextDate : ''}">
+            </div>
+            <div class="fg">
+                <label>下次里程</label>
+                <input type="number" id="maintNextOdo" inputmode="numeric" value="${m && m.nextOdo != null ? m.nextOdo : ''}">
+            </div>
+        </div>
+        <div class="fg">
+            <label>單據相片（可選）</label>
+            <div style="display:flex;gap:8px">
+                <button class="btn btn-out btn-sm" style="flex:1" onclick="addMaintImage('camera')">📷 影相</button>
+                <button class="btn btn-out btn-sm" style="flex:1" onclick="addMaintImage('file')">📁 上載</button>
+            </div>
+            <div id="maintImgBox" style="margin-top:8px"></div>
+        </div>`;
+
+    openFormModal(id ? '編輯保養記錄' : '新增保養記錄', body, () => {
+        const rec = {
+            id: m ? m.id : newId('mt'),
+            vehicleId: curVehId,
+            type: fval('maintType'),
+            date: fval('maintDate') ? new Date(fval('maintDate') + 'T12:00:00').toISOString() : new Date().toISOString(),
+            odo: fnum('maintOdo'), cost: fnum('maintCost'),
+            shop: fval('maintShop'), note: fval('maintNote'),
+            nextDate: fval('maintNextDate'), nextOdo: fnum('maintNextOdo'),
+            imgId: formPendingImg
+        };
+        const list = getMaint().filter(x => x.id !== rec.id);
+        list.push(rec);
+        if (!setMaint(list)) { toast('儲存失敗，空間不足'); return; }
+        closeFormModal();
+        renderMaint();
+        toast('保養記錄已儲存');
+    });
+    renderMaintImg();
+}
+
+function addMaintImage(mode) {
+    pickImage(mode === 'camera' ? 'docImgCam' : 'docImgFile', id => {
+        if (formPendingImg) IMGDB.del(formPendingImg);
+        formPendingImg = id;
+        renderMaintImg();
+    });
+}
+
+function renderMaintImg() {
+    const box = document.getElementById('maintImgBox');
+    if (!box) return;
+    box.innerHTML = formPendingImg
+        ? `<img data-img-id="${formPendingImg}" style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" onclick="viewStoredImage('${formPendingImg}')">`
+        : '<span style="font-size:12px;color:var(--txt2)">未有相片</span>';
+    hydrateImages(box);
+}
+
+function deleteMaint(id) {
+    const m = getMaint().find(x => x.id === id);
+    if (!m) return;
+    confirmDelete(`確定要刪除「${m.type}」記錄？`, () => {
+        if (m.imgId) IMGDB.del(m.imgId);
+        setMaint(getMaint().filter(x => x.id !== id));
+        renderMaint();
+        toast('已刪除');
+    });
+}
+
+// ================================================================
+//  AI 讀入油單
+//  相片會經你自己嘅 Cloudflare Worker 轉去 Claude，API key 只存喺
+//  Worker（Secret），唔會出現喺呢個網頁度。
+// ================================================================
+function getAiProxy() { return (localStorage.getItem('pk_ai_proxy') || '').trim(); }
+function setAiProxy(v) { localStorage.setItem('pk_ai_proxy', (v || '').trim()); }
+
+function scanReceipt(mode) {
+    const status = document.getElementById('fuelAiStatus');
+    pickImage(mode === 'camera' ? 'docImgCam' : 'docImgFile', (id, dataUrl) => {
+        if (formPendingImg && formPendingImg !== id) IMGDB.del(formPendingImg);
+        formPendingImg = id;
+        const thumb = document.getElementById('fuelAiThumb');
+        if (thumb) thumb.innerHTML = `<img src="${dataUrl}" style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" onclick="viewPhoto(this.src)">`;
+
+        const proxy = getAiProxy();
+        if (!proxy) {
+            status.innerHTML = '相已存低。<b>未設定 AI 中轉網址</b>，請去「設定 → AI 讀單」填，或者自己填低面嘅數。';
+            return;
+        }
+
+        status.textContent = '⏳ AI 讀緊張單…';
+        const comma = dataUrl.indexOf(',');
+        const b64 = dataUrl.slice(comma + 1);
+
+        fetch(proxy.replace(/\/$/, '') + '/receipt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: b64, media_type: 'image/jpeg' })
+        })
+        .then(r => r.json().then(j => ({ ok: r.ok, j })))
+        .then(({ ok, j }) => {
+            if (!ok || j.error) { status.textContent = '⚠️ AI 讀單失敗：' + (j.error || '未知錯誤') + '，請自己填'; return; }
+            applyReceipt(j);
+        })
+        .catch(e => { status.textContent = '⚠️ 連唔到 AI 中轉（' + e.message + '），請自己填'; });
+    });
+}
+
+function applyReceipt(d) {
+    const status = document.getElementById('fuelAiStatus');
+    const set = (id, v) => { const el = document.getElementById(id); if (el && v !== null && v !== undefined && v !== '') el.value = v; };
+    const got = [];
+
+    if (typeof d.liters === 'number') { set('fuelLiters', d.liters); got.push(`${d.liters} L`); }
+    if (typeof d.price_per_liter === 'number') { set('fuelPrice', d.price_per_liter); got.push(`$${d.price_per_liter}/L`); }
+    if (typeof d.total === 'number') { set('fuelTotal', d.total); got.push(`共 $${d.total}`); }
+    if (d.station) { set('fuelStation', d.station); got.push(d.station); }
+    if (typeof d.odometer === 'number') { set('fuelOdo', d.odometer); got.push(`里程 ${d.odometer}`); }
+    if (d.datetime) {
+        const dt = new Date(d.datetime);
+        if (!isNaN(dt.getTime())) {
+            set('fuelDate', `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`);
+            got.push(fmtDate(dt));
+        }
+    }
+
+    if (!got.length) {
+        status.textContent = '⚠️ 張單睇唔到有用數據，請自己填';
+        return;
+    }
+    status.innerHTML = `✅ AI 讀到：${esc(got.join('、'))}<br><span style="color:var(--warn)">請核對一次先儲存。</span>`;
+    toast('AI 已填入數據，請核對');
+}
+
+// ================================================================
+//  到期提醒（保險、驗車、行車證、保養）
+// ================================================================
+function getExpiryAlerts() {
+    const vehicles = getVehicles();
+    const out = [];
+
+    getDocs().forEach(d => {
+        const dd = daysUntil(d.expiry);
+        if (dd === null || dd > 60) return;
+        const v = vehicles.find(x => x.id === d.vehicleId);
+        out.push({
+            kind: 'doc', vehicleId: d.vehicleId,
+            title: `${v ? v.name : '車輛'}－${d.title || d.kind}`,
+            days: dd,
+            text: dd < 0 ? `已過期 ${-dd} 日` : dd === 0 ? '今日到期' : `仲有 ${dd} 日到期`
+        });
+    });
+
+    const odoByVeh = {};
+    vehicles.forEach(v => { odoByVeh[v.id] = fuelStats(v.id).lastOdo; });
+
+    getMaint().forEach(m => {
+        const v = vehicles.find(x => x.id === m.vehicleId);
+        const dd = daysUntil(m.nextDate);
+        if (dd !== null && dd <= 60) {
+            out.push({
+                kind: 'maint', vehicleId: m.vehicleId,
+                title: `${v ? v.name : '車輛'}－下次${m.type}`,
+                days: dd,
+                text: dd < 0 ? `已過期 ${-dd} 日` : dd === 0 ? '今日到期' : `仲有 ${dd} 日`
+            });
+        }
+        const odo = odoByVeh[m.vehicleId];
+        if (typeof m.nextOdo === 'number' && odo && m.nextOdo - odo <= 1000) {
+            const left = m.nextOdo - odo;
+            out.push({
+                kind: 'maint', vehicleId: m.vehicleId,
+                title: `${v ? v.name : '車輛'}－下次${m.type}`,
+                days: left <= 0 ? -1 : 999,
+                text: left <= 0 ? `里程已超 ${-left} km` : `仲有 ${left.toLocaleString()} km`
+            });
+        }
+    });
+
+    return out.sort((a, b) => a.days - b.days);
+}
+
+function renderExpiryAlerts() {
+    const alerts = getExpiryAlerts();
+    if (!alerts.length) return '';
+    return `<p class="section-title">📅 到期提醒</p>` + alerts.map(a => `
+        <div class="card" style="padding:12px;border-left:4px solid ${a.days < 0 ? 'var(--danger)' : a.days <= 14 ? 'var(--warn)' : 'var(--pri)'}"
+             onclick="openVehicle('${a.vehicleId}')">
+            <div style="font-size:14px;font-weight:700">${esc(a.title)}</div>
+            <div style="font-size:12px;color:${a.days < 0 ? 'var(--danger)' : 'var(--txt2)'};margin-top:2px">${esc(a.text)}</div>
+        </div>`).join('');
+}
+
+
+// ================================================================
+//  備份內容（本機檔案同 Google Drive 共用同一個格式）
+//  包埋 IndexedDB 入面嘅文件／單據相片，所以一個檔就還原到全部嘢。
+// ================================================================
+async function buildBackupPayload() {
+    const images = await IMGDB.all().catch(() => []);
+    return {
+        _app: '泊車記錄',
+        _version: 2,
+        _exportedAt: new Date().toISOString(),
+        pk_vehicles: getVehicles(),
+        pk_records: getRecords(),
+        pk_own_locations: getOwnLocations(),
+        pk_fuel: getFuel(),
+        pk_maint: getMaint(),
+        pk_docs: getDocs(),
+        pk_auto_delete: localStorage.getItem('pk_auto_delete') || '0',
+        pk_auto_backup: localStorage.getItem('pk_auto_backup') || '0',
+        pk_ai_proxy: localStorage.getItem('pk_ai_proxy') || '',
+        images   // [{id, data, at}]
+    };
+}
+
+async function restoreBackupPayload(data) {
+    if (data.pk_vehicles) setVehicles(data.pk_vehicles);
+    if (data.pk_records) setRecords(data.pk_records);
+    if (data.pk_own_locations) setOwnLocations(data.pk_own_locations);
+    if (data.pk_fuel) setFuel(data.pk_fuel);
+    if (data.pk_maint) setMaint(data.pk_maint);
+    if (data.pk_docs) setDocs(data.pk_docs);
+    if (data.pk_auto_delete) localStorage.setItem('pk_auto_delete', data.pk_auto_delete);
+    if (data.pk_auto_backup) localStorage.setItem('pk_auto_backup', data.pk_auto_backup);
+    if (data.pk_ai_proxy) localStorage.setItem('pk_ai_proxy', data.pk_ai_proxy);
+
+    if (Array.isArray(data.images)) {
+        for (const img of data.images) {
+            if (img && img.id && img.data) await IMGDB.put(img.id, img.data).catch(() => {});
+        }
+    }
+}
+
+function backupSummary(data) {
+    return [
+        `${(data.pk_vehicles || []).length} 架車輛`,
+        `${(data.pk_records || []).length} 條泊車記錄`,
+        `${(data.pk_fuel || []).length} 次入油`,
+        `${(data.pk_maint || []).length} 條保養`,
+        `${(data.pk_docs || []).length} 份文件`,
+        `${(data.images || []).length} 張相片`
+    ].join('、');
+}
+
+// ================================================================
+//  Google Drive 備份
+//  用 Google Identity Services，drive.file 權限 —— 即係佢只睇到／改到
+//  呢個 App 自己建立嘅檔案，掂唔到你 Drive 入面其他嘢。
+// ================================================================
+const DRIVE = {
+    SCOPE: 'https://www.googleapis.com/auth/drive.file',
+    FOLDER: '泊車記錄備份',
+    _token: null,
+    _exp: 0,
+    _gisLoaded: false,
+
+    clientId() { return (localStorage.getItem('pk_gdrive_client_id') || '').trim(); },
+
+    loadGis() {
+        if (DRIVE._gisLoaded && window.google && google.accounts) return Promise.resolve();
+        return new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = 'https://accounts.google.com/gsi/client';
+            s.async = true;
+            s.onload = () => { DRIVE._gisLoaded = true; resolve(); };
+            s.onerror = () => reject(new Error('載入 Google 登入元件失敗（要有網絡）'));
+            document.head.appendChild(s);
+        });
+    },
+
+    // interactive=false 會試靜靜咁攞 token（你之前已授權過就唔會彈窗）
+    async getToken(interactive) {
+        if (DRIVE._token && Date.now() < DRIVE._exp - 60000) return DRIVE._token;
+
+        const cid = DRIVE.clientId();
+        if (!cid) throw new Error('未設定 Google Client ID');
+
+        await DRIVE.loadGis();
+        return new Promise((resolve, reject) => {
+            const client = google.accounts.oauth2.initTokenClient({
+                client_id: cid,
+                scope: DRIVE.SCOPE,
+                prompt: interactive ? 'consent' : '',
+                callback: resp => {
+                    if (resp && resp.access_token) {
+                        DRIVE._token = resp.access_token;
+                        DRIVE._exp = Date.now() + (resp.expires_in || 3600) * 1000;
+                        resolve(DRIVE._token);
+                    } else {
+                        reject(new Error((resp && resp.error) || '攞唔到授權'));
+                    }
+                },
+                error_callback: err => reject(new Error((err && err.type) || '授權被取消'))
+            });
+            client.requestAccessToken();
+        });
+    },
+
+    async api(path, opts) {
+        const token = await DRIVE.getToken(false);
+        const r = await fetch(path, {
+            ...opts,
+            headers: { Authorization: 'Bearer ' + token, ...(opts && opts.headers || {}) }
+        });
+        if (r.status === 401) { DRIVE._token = null; throw new Error('授權過期，請再試一次'); }
+        if (!r.ok) throw new Error('Google Drive 回報錯誤 ' + r.status);
+        return r.json();
+    },
+
+    async folderId() {
+        const cached = localStorage.getItem('pk_gdrive_folder');
+        if (cached) return cached;
+
+        const q = encodeURIComponent(`name='${DRIVE.FOLDER}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+        const found = await DRIVE.api(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`);
+        if (found.files && found.files.length) {
+            localStorage.setItem('pk_gdrive_folder', found.files[0].id);
+            return found.files[0].id;
+        }
+        const made = await DRIVE.api('https://www.googleapis.com/drive/v3/files', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: DRIVE.FOLDER, mimeType: 'application/vnd.google-apps.folder' })
+        });
+        localStorage.setItem('pk_gdrive_folder', made.id);
+        return made.id;
+    },
+
+    async backup() {
+        const data = await buildBackupPayload();
+        const folder = await DRIVE.folderId();
+        const d = new Date();
+        const name = `parking-backup-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}.json`;
+
+        const boundary = 'pk' + Date.now();
+        const meta = JSON.stringify({ name, parents: [folder], mimeType: 'application/json' });
+        const body =
+            `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n` +
+            `--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(data)}\r\n` +
+            `--${boundary}--`;
+
+        const res = await DRIVE.api('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,size', {
+            method: 'POST',
+            headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+            body
+        });
+
+        localStorage.setItem('pk_last_backup', Date.now().toString());
+        localStorage.setItem('pk_gdrive_last', JSON.stringify({ at: Date.now(), name: res.name }));
+        return { file: res, summary: backupSummary(data) };
+    },
+
+    async listBackups() {
+        const folder = await DRIVE.folderId();
+        const q = encodeURIComponent(`'${folder}' in parents and trashed=false`);
+        const r = await DRIVE.api(`https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=createdTime desc&pageSize=20&fields=files(id,name,createdTime,size)`);
+        return r.files || [];
+    },
+
+    async download(fileId) {
+        const token = await DRIVE.getToken(false);
+        const r = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+            headers: { Authorization: 'Bearer ' + token }
+        });
+        if (!r.ok) throw new Error('下載失敗 ' + r.status);
+        return r.json();
+    }
+};
+
+function saveDriveClientId() {
+    const v = document.getElementById('gdriveIdInput').value.trim();
+    localStorage.setItem('pk_gdrive_client_id', v);
+    localStorage.removeItem('pk_gdrive_folder');   // 換咗帳號就唔好再用舊資料夾
+    DRIVE._token = null;
+    toast(v ? '已儲存 Google Client ID' : '已清除');
+    renderDriveStatus();
+}
+
+function renderDriveStatus() {
+    const el = document.getElementById('gdriveStatus');
+    if (!el) return;
+    const cid = DRIVE.clientId();
+    if (!cid) { el.innerHTML = '<span style="color:var(--txt2)">未設定，見下面步驟</span>'; return; }
+    let last = null;
+    try { last = JSON.parse(localStorage.getItem('pk_gdrive_last') || 'null'); } catch (e) {}
+    el.innerHTML = last
+        ? `✅ 上次備份：${fmtDateTime(new Date(last.at))}<br><span style="color:var(--txt2)">${esc(last.name)}</span>`
+        : '<span style="color:var(--txt2)">未備份過</span>';
+}
+
+async function driveBackupNow() {
+    const btn = document.getElementById('gdriveBackupBtn');
+    if (!DRIVE.clientId()) { toast('請先填 Google Client ID'); return; }
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ 備份緊…'; }
+    try {
+        await DRIVE.getToken(true).catch(async () => await DRIVE.getToken(false));
+        const { summary } = await DRIVE.backup();
+        toast('已備份到 Google Drive：' + summary);
+        renderDriveStatus();
+        renderBackupInfo();
+    } catch (e) {
+        console.error(e);
+        toast('備份失敗：' + e.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '☁️ 立即備份到 Google Drive'; }
+    }
+}
+
+async function driveRestore() {
+    if (!DRIVE.clientId()) { toast('請先填 Google Client ID'); return; }
+    try {
+        await DRIVE.getToken(true).catch(async () => await DRIVE.getToken(false));
+        const files = await DRIVE.listBackups();
+        if (!files.length) { toast('Drive 入面未有備份'); return; }
+
+        document.getElementById('delModalTitle').textContent = '由 Google Drive 還原';
+        document.getElementById('delMsg').innerHTML =
+            '<div style="margin-bottom:10px;font-size:13px">揀返一個備份（會覆蓋而家部機嘅資料）：</div>' +
+            files.map(f => `<button class="btn btn-out" style="margin-bottom:6px;font-size:13px" onclick="doDriveRestore('${f.id}')">${esc(f.name)}<br><span style="font-size:11px;color:var(--txt2)">${fmtDateTime(new Date(f.createdTime))}</span></button>`).join('');
+        document.getElementById('delConfBtn').style.display = 'none';
+        document.getElementById('delModal').classList.add('show');
+    } catch (e) {
+        toast('讀取備份失敗：' + e.message);
+    }
+}
+
+async function doDriveRestore(fileId) {
+    closeDelModal();
+    try {
+        const data = await DRIVE.download(fileId);
+        if (!data || data._app !== '泊車記錄') { toast('唔係有效嘅備份檔'); return; }
+        if (!confirm(`將會還原：${backupSummary(data)}\n\n而家部機嘅資料會被覆蓋，確定？`)) return;
+        await restoreBackupPayload(data);
+        toast('已還原');
+        renderSettings();
+        renderHome();
+    } catch (e) {
+        toast('還原失敗：' + e.message);
     }
 }
 
