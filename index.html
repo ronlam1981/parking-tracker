@@ -136,7 +136,11 @@
 
         .rec-card{background:var(--card);border-radius:var(--r);padding:14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);border-left:4px solid var(--pri)}
         .rec-card.moto{border-left-color:var(--warn)}
-        .rec-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+        .rec-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+        .rec-card .rec-thumb{width:36px;height:36px;border-radius:6px;object-fit:cover;flex-shrink:0;border:1px solid var(--border)}
+        .rec-card .rec-thumb.ph{display:flex;align-items:center;justify-content:center;font-size:18px;background:#f1f5f9}
+        .rec-card .rec-arrow{font-size:13px;color:var(--txt2);flex-shrink:0;width:14px;text-align:center}
+        .rec-card .rec-head + *{margin-top:10px}
         .vtag{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600}
         .vtag.car{background:#dbeafe;color:var(--pri)}
         .vtag.moto{background:#fef3c7;color:#b45309}
@@ -145,7 +149,7 @@
         .ptag.free{background:#eff6ff;color:#2563eb}
         .ptag.meter{background:#fefce8;color:#a16207}
         .ptag.lot{background:#faf5ff;color:#7c3aed}
-        .rec-time{font-size:11px;color:var(--txt2)}
+        .rec-time{font-size:11px;color:var(--txt2);margin-top:3px}
         .rec-photo{width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-bottom:8px}
         .rec-loc{font-size:13px;margin-bottom:6px}
         .rec-notes{font-size:12px;color:var(--txt2);padding:8px;background:#f8fafc;border-radius:6px;margin-bottom:6px}
@@ -208,6 +212,7 @@
         .now-card .now-right{text-align:right;flex-shrink:0}
         .now-card .now-badge{font-size:11px;opacity:.95;margin-top:2px;white-space:nowrap}
         .now-card .now-arrow{font-size:14px;opacity:.8;flex-shrink:0;width:14px;text-align:center}
+        .now-card .now-quick{flex-shrink:0;width:38px;height:38px;border:none;border-radius:8px;background:rgba(255,255,255,.9);font-size:17px;cursor:pointer;padding:0}
         .now-card .now-body{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.25)}
         .now-card .now-label{font-size:12px;opacity:.85;letter-spacing:1px;margin-bottom:8px}
         .now-card .now-veh{font-size:18px;font-weight:800;display:flex;align-items:center;gap:8px}
@@ -689,7 +694,10 @@ function renderHomeNow(vehicles, records) {
         const v = vehicles.find(x => x.id === r.vehicleId);
         const vName = v ? v.name : '未知車輛';
         const t = new Date(r.timestamp);
-        const open = expandedCards.has(r.id);
+        // 得一架車泊緊就自動展開（除非你自己收埋咗）
+        const open = actives.length === 1
+            ? !collapsedCards.has(r.id)
+            : expandedCards.has(r.id);
 
         // 咪錶過期就成張卡轉紅
         const endMs = (r.parkType === 'meter' && r.meterEndTime) ? new Date(r.meterEndTime).getTime() : 0;
@@ -746,6 +754,7 @@ function renderHomeNow(vehicles, records) {
                     <div class="now-elapsed js-elapsed" data-since="${t.getTime()}" data-fmt="short">${fmtElapsedShort(Date.now() - t.getTime())}</div>
                     ${badge}
                 </div>
+                ${open ? '' : `<button class="now-quick" title="已泊完" onclick="event.stopPropagation();clearParking('${r.id}')">✅</button>`}
                 <div class="now-arrow">${open ? '▴' : '▾'}</div>
             </div>
             ${body}
@@ -753,12 +762,15 @@ function renderHomeNow(vehicles, records) {
     }).join('');
 }
 
-// 記住邊張卡展開咗（每次重開 App 自動摺疊返）
+// 記住邊張卡展開／收埋咗（每次重開 App 回復預設）
 const expandedCards = new Set();
+const collapsedCards = new Set();
 
 function toggleNowCard(id) {
-    if (expandedCards.has(id)) expandedCards.delete(id);
-    else expandedCards.add(id);
+    const card = document.querySelector(`.now-card.open .now-head[onclick*="${id}"]`);
+    const isOpen = !!card;
+    if (isOpen) { expandedCards.delete(id); collapsedCards.add(id); }
+    else { expandedCards.add(id); collapsedCards.delete(id); }
     renderHome();
 }
 
@@ -1701,6 +1713,7 @@ function renderHistory() {
     const typeLabels = { own: '自己停車場', free: '不收費位', meter: '咪錶位', lot: '公共停車場' };
 
     list.innerHTML = filtered.map(r => {
+        const open = batchMode || expandedRecs.has(r.id);
         const v = vehicles.find(x => x.id === r.vehicleId);
         const vName = v ? v.name : '未知車輛';
         const vType = v ? v.type : 'car';
@@ -1723,6 +1736,10 @@ function renderHistory() {
         const selRing = batchMode ? `<div class="rec-sel-ring">${isSelected ? '✓' : ''}</div>` : '';
         const cardOnClick = batchMode ? `onclick="toggleSelectRecord('${r.id}')"` : '';
 
+        const thumb = batchMode ? '' : (r.photo
+            ? `<img class="rec-thumb" src="${r.photo}" alt="">`
+            : `<div class="rec-thumb ph">${vType === 'car' ? '🚗' : '🏍️'}</div>`);
+
         const actionsHtml = batchMode ? '' : `
             <div class="rec-acts">
                 <button onclick="findMyCar('${r.id}')">🧭 導航</button>
@@ -1730,23 +1747,28 @@ function renderHistory() {
                 <button class="del" onclick="deleteRecord('${r.id}')">🗑️ 刪除</button>
             </div>`;
 
-        return `
-            <div class="rec-card ${vType === 'motorcycle' ? 'moto' : ''} ${r.pinned ? 'pinned-rec' : ''} ${batchMode && isSelected ? 'batch-sel' : ''}" ${cardOnClick}>
-                <div class="rec-head">
-                    ${selRing}
-                    <div style="flex:1">
-                        <span class="vtag ${vType === 'car' ? 'car' : 'moto'}">${vType === 'car' ? '🚗' : '🏍️'} ${esc(vName)}</span>
-                        <span class="ptag ${typeClass}">${typeLabels[r.parkType] || r.parkType}</span>
-                        ${activeTag}
-                        ${pinnedBadge}
-                    </div>
-                    <span class="rec-time">${t}</span>
-                </div>
+        const bodyHtml = open ? `
                 ${meterInfo}
                 ${locHtml}
                 ${photoHtml}
                 ${notesHtml}
-                ${actionsHtml}
+                ${actionsHtml}` : '';
+
+        return `
+            <div class="rec-card ${vType === 'motorcycle' ? 'moto' : ''} ${r.pinned ? 'pinned-rec' : ''} ${batchMode && isSelected ? 'batch-sel' : ''}" ${cardOnClick}>
+                <div class="rec-head" ${batchMode ? '' : `onclick="toggleRecCard('${r.id}')" style="cursor:pointer"`}>
+                    ${selRing}
+                    ${thumb}
+                    <div style="flex:1;min-width:0">
+                        <span class="vtag ${vType === 'car' ? 'car' : 'moto'}">${vType === 'car' ? '🚗' : '🏍️'} ${esc(vName)}</span>
+                        <span class="ptag ${typeClass}">${typeLabels[r.parkType] || r.parkType}</span>
+                        ${activeTag}
+                        ${pinnedBadge}
+                        <div class="rec-time">${t}</div>
+                    </div>
+                    ${batchMode ? '' : `<div class="rec-arrow">${open ? '▴' : '▾'}</div>`}
+                </div>
+                ${bodyHtml}
             </div>`;
     }).join('');
 
@@ -1758,6 +1780,15 @@ function renderHistory() {
     } else {
         batchBar.classList.add('hidden');
     }
+}
+
+// 記錄版：邊條展開咗（重開 App 自動收埋）
+const expandedRecs = new Set();
+
+function toggleRecCard(id) {
+    if (expandedRecs.has(id)) expandedRecs.delete(id);
+    else expandedRecs.add(id);
+    renderHistory();
 }
 
 function setHistFilter(f) {
